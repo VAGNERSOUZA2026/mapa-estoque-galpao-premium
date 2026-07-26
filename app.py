@@ -115,7 +115,7 @@ if not st.session_state.autenticado:
 # --- 🎯 LEITURA DO QR CODE (PEGA O PALLET DA URL) ---
 query_params = st.query_params
 
-# Suporta tanto ?pallet= canto ?p=
+# Suporta tanto ?pallet= quanto ?p=
 pallet_qr = query_params.get("pallet") or query_params.get("p")
 
 if pallet_qr:
