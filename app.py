@@ -120,9 +120,9 @@ pallet_qr = query_params.get("pallet") or query_params.get("p")
 
 if pallet_qr:
     st.markdown("---")
-    st.success(f"📱 **QR CODE LIDO COM SUCESSO!**")
+    st.success("📱 **QR CODE LIDO COM SUCESSO!**")
     st.header(f"📦 Vinhos Alocados em: **{pallet_qr}**")
-    
+
     # Filtra os vinhos ignorando maiúsculas/minúsculas e espaços extras
     vinhos_encontrados = []
     for v in st.session_state.estoque:
@@ -130,21 +130,21 @@ if pallet_qr:
         p_busca = str(pallet_qr).strip().lower()
         if p_busca in p_estoque or p_estoque in p_busca:
             vinhos_encontrados.append(v)
-            
+
     if vinhos_encontrados:
         for v in vinhos_encontrados:
             with st.container():
                 st.markdown(
-                    f"### 🍷 **{v.get('nome')}**
-"
-                    f"* **Safra:** {v.get('safra')} | **Lado:** {v.get('lado')}
-"
+                    f"### 🍷 **{v.get('nome')}**\n"
+                    f"* **Safra:** {v.get('safra')} | **Lado:** {v.get('lado')}\n"
                     f"* **Caixa:** {v.get('caixa')} | **Volume:** {v.get('volume')}"
                 )
                 st.markdown("---")
     else:
-        st.warning(f"⚠️ Nenhum vinho cadastrado em **{pallet_qr}** até o momento.")
-    
+        st.warning(
+            f"⚠️ Nenhum vinho cadastrado em **{pallet_qr}** até o momento."
+        )
+
     if st.button("⬅️ Ver Todo o Estoque do Galpão"):
         st.query_params.clear()
         st.rerun()
@@ -552,7 +552,9 @@ elif menu == "7. Gerar QR Code do Pallet":
     else:
         st.info("ℹ️ NENHUM vinho cadastrado neste pallet no momento.")
 
-    link_pallet_especifico = f"{URL_APLICATIVO}/?pallet={urllib.parse.quote(pallet_alvo)}"
+    link_pallet_especifico = (
+        f"{URL_APLICATIVO}/?pallet={urllib.parse.quote(pallet_alvo)}"
+    )
     url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(link_pallet_especifico)}"
 
     st.markdown("### 🖨️ QR Code de Acesso Direto ao Pallet:")
