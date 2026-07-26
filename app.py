@@ -15,7 +15,7 @@ st.set_page_config(
 SENHA_ACESSO = "1980"
 NOME_ARQUIVO = "estoque_galpao.json"
 
-# URL OFICIAL DO SEU APLICATIVO
+# URL OFICIAL DO APLICATIVO
 URL_APLICATIVO = "https://estoquegalpaopremiumwines-wpktxhltrgjranr6ujp7yi.streamlit.app"
 
 NOME_DEV = "Vagner Souza"
@@ -39,10 +39,10 @@ OPCOES_CAIXA = [
 
 estoque_padrao = [
     {
-        "nome": "Falernia Reserva",
+        "nome": "Falérnia Reserva",
         "tipo": "Tinto",
         "safra": "2021",
-        "pallet": "Corredor 01 - Pallet 02",
+        "pallet": "Corredor 01 - Pallet 01",
         "lado": "Direito",
         "caixa": "12 garrafas",
         "volume": "750ml",
@@ -112,24 +112,43 @@ if not st.session_state.autenticado:
             st.error("Senha incorreta!")
     st.stop()
 
-# --- VERIFICAÇÃO AUTOMÁTICA VIA QR CODE ---
+# --- 🎯 LEITURA DO QR CODE (PEGA O PALLET DA URL) ---
 query_params = st.query_params
-if "pallet" in query_params:
-    pallet_qr = query_params["pallet"]
-    st.info(f"📱 **QR Code Lido!** Mostrando vinhos alocados em: **{pallet_qr}**")
-    
-    vinhos_do_qr = [
-        v for v in st.session_state.estoque
-        if str(v.get("pallet", "")).strip().lower() == str(pallet_qr).strip().lower()
-    ]
-    
-    if vinhos_do_qr:
-        for v in vinhos_do_qr:
-            st.success(f"🍷 **{v.get('nome')}** (Safra: {v.get('safra')}) | Lado: {v.get('lado')} | Caixa: {v.get('caixa')}")
-    else:
-        st.warning(f"Nenhum vinho cadastrado no {pallet_qr} até o momento.")
-    st.markdown("---")
 
+# Suporta tanto ?pallet= canto ?p=
+pallet_qr = query_params.get("pallet") or query_params.get("p")
+
+if pallet_qr:
+    st.markdown("---")
+    st.success(f"📱 **QR CODE LIDO COM SUCESSO!**")
+    st.header(f"📦 Vinhos Alocados em: **{pallet_qr}**")
+    
+    # Filtra os vinhos ignorando maiúsculas/minúsculas e espaços extras
+    vinhos_encontrados = []
+    for v in st.session_state.estoque:
+        p_estoque = str(v.get("pallet", "")).strip().lower()
+        p_busca = str(pallet_qr).strip().lower()
+        if p_busca in p_estoque or p_estoque in p_busca:
+            vinhos_encontrados.append(v)
+            
+    if vinhos_encontrados:
+        for v in vinhos_encontrados:
+            with st.container():
+                st.markdown(
+                    f"### 🍷 **{v.get('nome')}**
+"
+                    f"* **Safra:** {v.get('safra')} | **Lado:** {v.get('lado')}
+"
+                    f"* **Caixa:** {v.get('caixa')} | **Volume:** {v.get('volume')}"
+                )
+                st.markdown("---")
+    else:
+        st.warning(f"⚠️ Nenhum vinho cadastrado em **{pallet_qr}** até o momento.")
+    
+    if st.button("⬅️ Ver Todo o Estoque do Galpão"):
+        st.query_params.clear()
+        st.rerun()
+    st.stop()
 
 # --- TÍTULO E LOGO ---
 col_logo, col_titulo = st.columns([1, 4])
@@ -299,9 +318,6 @@ elif menu == "3. Cadastrar novo vinho":
             st.write(
                 f"- **Safra {item.get('safra', 'N/I')}** ➔ Local: `{item.get('pallet', 'N/I')}` (Lado: {item.get('lado', 'N/I')})"
             )
-        st.caption(
-            "Você pode cadastrar uma **nova safra** ou **outra localização** preenchendo o formulário abaixo:"
-        )
 
     with st.form("form_cadastrar"):
         col_tipo, col_safra = st.columns(2)
@@ -498,7 +514,6 @@ elif menu == "6. Exportar planilha (CSV)":
             file_name="estoque_galpao.csv",
             mime="text/csv",
         )
-        st.info("💡 O arquivo será saved na pasta de Downloads do seu dispositivo.")
     else:
         st.warning("Nenhum dado para exportar.")
 
@@ -542,6 +557,3 @@ elif menu == "7. Gerar QR Code do Pallet":
 
     st.markdown("### 🖨️ QR Code de Acesso Direto ao Pallet:")
     st.image(url_qr, caption=f"Etiqueta QR Code para: {pallet_alvo}", width=250)
-    st.caption(
-        "Imprima este QR Code e cole no pallet. Ao ler com a câmera do celular, o sistema abrirá mostrando diretamente os vinhos deste pallet!"
-    )
