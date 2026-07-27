@@ -22,6 +22,8 @@ FONE_DEV = "(31) 98968-4010"
 
 LISTA_CORREDORES = [f"Corredor {i:02d}" for i in range(1, 26)]
 LISTA_PALLETS = [f"Pallet {i:02d}" for i in range(1, 26)]
+LISTA_PRATELEIRAS = [f"Prateleira {i:02d}" for i in range(1, 26)]
+LISTA_ANDARES = ["Andar 01", "Andar 02", "Andar 03"]
 LISTA_LADOS = ["Direito", "Esquerdo", "Centro / Único"]
 
 ANOS_SAFRA = [str(ano) for ano in range(2026, 1989, -1)]
@@ -51,7 +53,7 @@ estoque_padrao = [
         "nome": "Volpaia Chianti (375ml)",
         "tipo": "Tinto",
         "safra": "2020",
-        "pallet": "Corredor 02 - Pallet 01",
+        "pallet": "Corredor 02 - Prateleira 01 (Andar 02)",
         "lado": "Esquerdo",
         "caixa": "24 garrafas",
         "volume": "375ml",
@@ -102,7 +104,7 @@ def formatar_caixa(valor_caixa):
 if "estoque" not in st.session_state:
     st.session_state.estoque = carregar_dados()
 
-# --- 🎯 LEITURA DO QR CODE (PEGA O PALLET DA URL) ---
+# --- 🎯 LEITURA DO QR CODE (PEGA O PALLET OU PRATELEIRA DA URL) ---
 query_params = st.query_params
 pallet_qr = query_params.get("pallet") or query_params.get("p")
 
@@ -178,7 +180,7 @@ menu = st.sidebar.radio(
         "4. Editar vinho existente",
         "5. Excluir vinho",
         "6. Exportar planilha (CSV)",
-        "7. Gerar QR Code do Pallet",
+        "7. Gerar QR Code de Localização",
     ],
 )
 
@@ -192,12 +194,17 @@ if menu == "1. Buscar vinho":
 
     sub_op = st.radio(
         "Como deseja buscar?",
-        ["Por Nome", "Por Tipo", "Por Safra", "Por Pallet / Corredor"],
+        [
+            "Por Nome",
+            "Por Tipo",
+            "Por Safra",
+            "Por Localização (Pallet/Prateleira/Andar)",
+        ],
     )
 
     termo = (
         st.text_input(
-            "🔎 Digite o termo de busca (Ex: Corredor 01 ou Falernia):"
+            "🔎 Digite o termo de busca (Ex: Andar 02, Prateleira 01 ou Falernia):"
         )
         .strip()
         .lower()
@@ -217,7 +224,10 @@ if menu == "1. Buscar vinho":
                 resultados.append(v)
             elif sub_op == "Por Safra" and termo in safra_vinho:
                 resultados.append(v)
-            elif sub_op == "Por Pallet / Corredor" and termo in pallet_vinho:
+            elif (
+                sub_op == "Por Localização (Pallet/Prateleira/Andar)"
+                and termo in pallet_vinho
+            ):
                 resultados.append(v)
 
         if not resultados:
@@ -256,7 +266,7 @@ elif menu == "2. Ver todos os vinhos":
             [
                 "Ordem padrão",
                 "Ordem Alfabética (Nome)",
-                "Agrupado por Localização (Corredor/Pallet)",
+                "Agrupado por Localização (Corredor/Pallet/Prateleira)",
             ],
         )
 
@@ -268,7 +278,7 @@ elif menu == "2. Ver todos os vinhos":
 
         if ordem == "Ordem Alfabética (Nome)":
             lista_exibicao.sort(key=lambda x: str(x.get("nome", "")).lower())
-        elif ordem == "Agrupado por Localização (Corredor/Pallet)":
+        elif ordem == "Agrupado por Localização (Corredor/Pallet/Prateleira)":
             lista_exibicao.sort(key=lambda x: str(x.get("pallet", "")).lower())
 
         df = pd.DataFrame(lista_exibicao)
@@ -276,7 +286,7 @@ elif menu == "2. Ver todos os vinhos":
             "nome": "Nome do Vinho",
             "tipo": "Tipo",
             "safra": "Safra",
-            "pallet": "Localização / Pallet",
+            "pallet": "Localização (Pallet / Prateleira)",
             "lado": "Lado do Corredor",
             "caixa": "Caixa",
             "volume": "Volume",
@@ -320,13 +330,30 @@ elif menu == "3. Cadastrar novo vinho":
         if safra_opcao == "Outra / Mais antiga":
             safra_custom = st.text_input("Digite o ano da safra (Ex: 1985):")
 
-        col_corr, col_pal, col_lad = st.columns(3)
-        with col_corr:
-            sel_corredor = st.selectbox("🛣️ Corredor:", LISTA_CORREDORES)
-        with col_pal:
-            sel_pallet = st.selectbox("📦 Pos./Pallet:", LISTA_PALLETS)
-        with col_lad:
-            lado = st.selectbox("↔️ Lado:", LISTA_LADOS)
+        # Escolha do local (Pallet ou Prateleira)
+        tipo_local = st.radio(
+            "🏗️ Tipo de estrutura:", ["Pallet", "Prateleira"], horizontal=True
+        )
+
+        sel_andar = ""
+        if tipo_local == "Pallet":
+            col_corr, col_pos, col_lad = st.columns(3)
+            with col_corr:
+                sel_corredor = st.selectbox("🛣️ Corredor:", LISTA_CORREDORES)
+            with col_pos:
+                sel_posicao = st.selectbox("📦 Pallet:", LISTA_PALLETS)
+            with col_lad:
+                lado = st.selectbox("↔️ Lado:", LISTA_LADOS)
+        else:
+            col_corr, col_pos, col_and, col_lad = st.columns(4)
+            with col_corr:
+                sel_corredor = st.selectbox("🛣️ Corredor:", LISTA_CORREDORES)
+            with col_pos:
+                sel_posicao = st.selectbox("🪵 Prateleira:", LISTA_PRATELEIRAS)
+            with col_and:
+                sel_andar = st.selectbox("🪜 Andar:", LISTA_ANDARES)
+            with col_lad:
+                lado = st.selectbox("↔️ Lado:", LISTA_LADOS)
 
         caixa_opcao = st.selectbox(
             "📦 Quantidade de garrafas por caixa:", OPCOES_CAIXA
@@ -364,14 +391,17 @@ elif menu == "3. Cadastrar novo vinho":
                 volume_custom if vol_opcao == "Outro valor" else vol_opcao
             )
 
-            pallet_final = f"{sel_corredor} - {sel_pallet}"
+            if tipo_local == "Prateleira":
+                local_final = f"{sel_corredor} - {sel_posicao} ({sel_andar})"
+            else:
+                local_final = f"{sel_corredor} - {sel_posicao}"
 
             if nome and tipo:
                 novo_vinho = {
                     "nome": nome,
                     "tipo": tipo,
                     "safra": safra_final if safra_final else "Sem Safra (NV)",
-                    "pallet": pallet_final,
+                    "pallet": local_final,
                     "lado": lado,
                     "caixa": formatar_caixa(caixa_final),
                     "volume": volume_final if volume_final else "750ml",
@@ -379,7 +409,7 @@ elif menu == "3. Cadastrar novo vinho":
                 st.session_state.estoque.append(novo_vinho)
                 salvar_dados(st.session_state.estoque)
                 st.success(
-                    f"✅ '{nome}' ({safra_final}) cadastrado com sucesso em `{pallet_final}`!"
+                    f"✅ '{nome}' ({safra_final}) cadastrado com sucesso em `{local_final}`!"
                 )
                 st.rerun()
             else:
@@ -424,7 +454,8 @@ elif menu == "4. Editar vinho existente":
                 )
 
             novo_pallet = st.text_input(
-                "Nova Localização:", str(vinho.get("pallet", ""))
+                "Nova Localização (Ex: Corredor 01 - Prateleira 02 (Andar 03)):",
+                str(vinho.get("pallet", "")),
             )
 
             lado_atual = vinho.get("lado", "Direito")
@@ -509,47 +540,62 @@ elif menu == "6. Exportar planilha (CSV)":
     else:
         st.warning("Nenhum dado para exportar.")
 
-# 7. GERAR QR CODE DO PALLET
-elif menu == "7. Gerar QR Code do Pallet":
+# 7. GERAR QR CODE DE LOCALIZAÇÃO (PALLET / PRATELEIRA)
+elif menu == "7. Gerar QR Code de Localização":
     st.header("📱 GERADOR DE ETIQUETAS QR CODE")
     st.write(
-        "Gere QR Codes inteligentes para colar nos pallets e consultar os vinhos na hora usando a câmera do celular."
+        "Gere QR Codes inteligentes para colar nos pallets ou prateleiras e consultar os vinhos na hora usando a câmera do celular."
     )
 
-    c1, c2 = st.columns(2)
-    with c1:
-        qr_corr = st.selectbox("Selecione o Corredor:", LISTA_CORREDORES)
-    with c2:
-        qr_pal = st.selectbox("Selecione o Pallet:", LISTA_PALLETS)
+    tipo_qr = st.radio(
+        "Selecione o tipo de local para gerar a etiqueta:",
+        ["Pallet", "Prateleira"],
+        horizontal=True,
+    )
 
-    pallet_alvo = f"{qr_corr} - {qr_pal}"
+    if tipo_qr == "Pallet":
+        c1, c2 = st.columns(2)
+        with c1:
+            qr_corr = st.selectbox("Selecione o Corredor:", LISTA_CORREDORES)
+        with c2:
+            qr_pos = st.selectbox("Selecione o Pallet:", LISTA_PALLETS)
+        local_alvo = f"{qr_corr} - {qr_pos}"
+    else:
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            qr_corr = st.selectbox("Selecione o Corredor:", LISTA_CORREDORES)
+        with c2:
+            qr_pos = st.selectbox("Selecione a Prateleira:", LISTA_PRATELEIRAS)
+        with c3:
+            qr_and = st.selectbox("Selecione o Andar:", LISTA_ANDARES)
+        local_alvo = f"{qr_corr} - {qr_pos} ({qr_and})"
 
-    vinhos_no_pallet = [
+    vinhos_no_local = [
         v
         for v in st.session_state.estoque
-        if str(v.get("pallet", "")).strip().lower() == pallet_alvo.lower()
+        if str(v.get("pallet", "")).strip().lower() == local_alvo.lower()
     ]
 
     st.markdown("---")
-    st.subheader(f"📍 Pallet Selecionado: `{pallet_alvo}`")
+    st.subheader(f"📍 Local Selecionado: `{local_alvo}`")
 
-    if vinhos_no_pallet:
+    if vinhos_no_local:
         st.success(
-            f"📦 Encontrado(s) {len(vinhos_no_pallet)} produto(s) neste pallet:"
+            f"📦 Encontrado(s) {len(vinhos_no_local)} produto(s) neste local:"
         )
-        for v in vinhos_no_pallet:
+        for v in vinhos_no_local:
             caixa_txt = formatar_caixa(v.get("caixa"))
             st.write(
                 f"- **{v.get('nome')}** | Safra: **{v.get('safra')}** | Lado: {v.get('lado')} | Cx: {caixa_txt}"
             )
     else:
-        st.info("ℹ️ NENHUM vinho cadastrado neste pallet no momento.")
+        st.info("ℹ️ NENHUM vinho cadastrado neste local no momento.")
 
-    link_pallet_especifico = (
-        f"{URL_APLICATIVO}/?pallet={urllib.parse.quote(pallet_alvo)}"
+    link_especifico = (
+        f"{URL_APLICATIVO}/?pallet={urllib.parse.quote(local_alvo)}"
     )
-    url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(link_pallet_especifico)}"
+    url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(link_especifico)}"
 
-    st.markdown("### 🖨️ QR Code de Acesso Direto ao Pallet:")
-    st.image(url_qr, caption=f"Etiqueta QR Code para: {pallet_alvo}", width=250)
-    st.info(f"🔗 Link gerado: `{link_pallet_especifico}`")
+    st.markdown("### 🖨️ QR Code de Acesso Direto:")
+    st.image(url_qr, caption=f"Etiqueta QR Code para: {local_alvo}", width=250)
+    st.info(f"🔗 Link gerado: `{link_especifico}`")
