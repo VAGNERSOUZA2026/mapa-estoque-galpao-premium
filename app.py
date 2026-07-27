@@ -27,6 +27,7 @@ LISTA_LADOS = ["Direito", "Esquerdo", "Centro / Único"]
 ANOS_SAFRA = [str(ano) for ano in range(2026, 1989, -1)]
 OPCOES_SAFRA = ["Sem Safra (NV)", "Outra / Mais antiga"] + ANOS_SAFRA
 
+# OPÇÕES PADRÃO DE CAIXA DE GARRAFAS
 OPCOES_CAIXA = [
     "24 garrafas",
     "12 garrafas",
@@ -87,14 +88,22 @@ def salvar_dados(estoque):
         st.error(f"Erro ao salvar dados: {e}")
 
 
+def formatar_caixa(valor_caixa):
+    """Garante a formatação correta e amigável da quantidade na caixa."""
+    if not valor_caixa:
+        return "12 garrafas"
+    valor_str = str(valor_caixa).strip()
+    if valor_str.isdigit():
+        return f"{valor_str} garrafas"
+    return valor_str
+
+
 # Inicializa a sessão do estoque
 if "estoque" not in st.session_state:
     st.session_state.estoque = carregar_dados()
 
 # --- 🎯 LEITURA DO QR CODE (PEGA O PALLET DA URL) ---
 query_params = st.query_params
-
-# Suporta tanto ?pallet= quanto ?p=
 pallet_qr = query_params.get("pallet") or query_params.get("p")
 
 if pallet_qr:
@@ -102,7 +111,6 @@ if pallet_qr:
     st.success("📱 **QR CODE LIDO COM SUCESSO!**")
     st.header(f"📦 Vinhos Alocados em: **{pallet_qr}**")
 
-    # Filtra os vinhos ignorando maiúsculas/minúsculas e espaços extras
     vinhos_encontrados = []
     for v in st.session_state.estoque:
         p_estoque = str(v.get("pallet", "")).strip().lower()
@@ -112,11 +120,12 @@ if pallet_qr:
 
     if vinhos_encontrados:
         for v in vinhos_encontrados:
+            caixa_exibicao = formatar_caixa(v.get("caixa"))
             with st.container():
                 st.markdown(
                     f"### 🍷 **{v.get('nome')}**\n"
                     f"* **Safra:** {v.get('safra')} | **Lado:** {v.get('lado')}\n"
-                    f"* **Caixa:** {v.get('caixa')} | **Volume:** {v.get('volume')}"
+                    f"* **Caixa:** {caixa_exibicao} | **Volume:** {v.get('volume')}"
                 )
                 st.markdown("---")
     else:
@@ -220,6 +229,7 @@ if menu == "1. Buscar vinho":
                     f" - Lado {v.get('lado')}" if v.get("lado") else ""
                 )
                 safra_txt = f" ({v.get('safra')})" if v.get("safra") else ""
+                caixa_txt = formatar_caixa(v.get("caixa"))
                 with st.expander(
                     f"🍷 {v.get('nome', 'Sem nome')}{safra_txt} [{v.get('tipo', 'S/T')}] ➔ 📍 {v.get('pallet', 'S/P')}{lado_txt}",
                     expanded=True,
@@ -231,7 +241,7 @@ if menu == "1. Buscar vinho":
                         f"**Lado do Corredor:** {v.get('lado', 'Não informado')}"
                     )
                     st.write(f"**Safra:** {v.get('safra', 'N/I')}")
-                    st.write(f"**Caixa:** {v.get('caixa', 'N/I')}")
+                    st.write(f"**Caixa:** {caixa_txt}")
                     st.write(f"**Volume:** {v.get('volume', 'N/I')}")
 
 # 2. VER TODOS OS VINHOS
@@ -250,7 +260,11 @@ elif menu == "2. Ver todos os vinhos":
             ],
         )
 
-        lista_exibicao = [dict(v) for v in st.session_state.estoque]
+        lista_exibicao = []
+        for v in st.session_state.estoque:
+            v_copy = dict(v)
+            v_copy["caixa"] = formatar_caixa(v_copy.get("caixa"))
+            lista_exibicao.append(v_copy)
 
         if ordem == "Ordem Alfabética (Nome)":
             lista_exibicao.sort(key=lambda x: str(x.get("nome", "")).lower())
@@ -320,7 +334,9 @@ elif menu == "3. Cadastrar novo vinho":
 
         caixa_custom = ""
         if caixa_opcao == "Outra quantidade":
-            caixa_custom = st.text_input("Digite a quantidade de garrafas:")
+            caixa_custom = st.text_input(
+                "Digite a quantidade de garrafas (Ex: 12 garrafas):"
+            )
 
         vol_opcao = st.selectbox(
             "🧪 Volume / Tamanho da garrafa:",
@@ -357,7 +373,7 @@ elif menu == "3. Cadastrar novo vinho":
                     "safra": safra_final if safra_final else "Sem Safra (NV)",
                     "pallet": pallet_final,
                     "lado": lado,
-                    "caixa": caixa_final if caixa_final else "12 garrafas",
+                    "caixa": formatar_caixa(caixa_final),
                     "volume": volume_final if volume_final else "750ml",
                 }
                 st.session_state.estoque.append(novo_vinho)
@@ -419,13 +435,15 @@ elif menu == "4. Editar vinho existente":
             )
             novo_lado = st.selectbox("Novo Lado:", LISTA_LADOS, index=idx_l)
 
-            caixa_atual = vinho.get("caixa", "12 garrafas")
+            caixa_atual = str(vinho.get("caixa", "12 garrafas"))
             idx_caixa = (
                 OPCOES_CAIXA.index(caixa_atual)
                 if caixa_atual in OPCOES_CAIXA
-                else 0
+                else 1
             )
-            nova_caixa = st.selectbox("Caixa:", OPCOES_CAIXA, index=idx_caixa)
+            nova_caixa = st.selectbox(
+                "Quantidade na Caixa:", OPCOES_CAIXA, index=idx_caixa
+            )
 
             novo_volume = st.text_input(
                 "Volume:", str(vinho.get("volume", "750ml"))
@@ -520,13 +538,13 @@ elif menu == "7. Gerar QR Code do Pallet":
             f"📦 Encontrado(s) {len(vinhos_no_pallet)} produto(s) neste pallet:"
         )
         for v in vinhos_no_pallet:
+            caixa_txt = formatar_caixa(v.get("caixa"))
             st.write(
-                f"- **{v.get('nome')}** | Safra: **{v.get('safra')}** | Lado: {v.get('lado')} | Cx: {v.get('caixa')}"
+                f"- **{v.get('nome')}** | Safra: **{v.get('safra')}** | Lado: {v.get('lado')} | Cx: {caixa_txt}"
             )
     else:
         st.info("ℹ️ NENHUM vinho cadastrado neste pallet no momento.")
 
-    # Constrói o link com a URL exata do seu app no Streamlit Cloud
     link_pallet_especifico = (
         f"{URL_APLICATIVO}/?pallet={urllib.parse.quote(pallet_alvo)}"
     )
