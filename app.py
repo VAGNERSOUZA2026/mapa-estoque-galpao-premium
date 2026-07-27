@@ -1,380 +1,535 @@
-import streamlit as st
 import json
 import os
-import qrcode
-import io
+import urllib.parse
 import pandas as pd
+import streamlit as st
 
-# ---------------------------------------------------------
-# CONFIGURAÇÃO DA PÁGINA
-# ---------------------------------------------------------
+# Configuração da página
 st.set_page_config(
-    page_title="WMS - Galpão de Vinhos",
+    page_title="Mapa Estoque Galpão Premium",
     page_icon="🍷",
     layout="wide",
-    initial_sidebar_state="collapsed"
 )
 
-# ---------------------------------------------------------
-# ESTILIZAÇÃO CUSTOMIZADA (ESTILO SHADCN UI / REACT)
-# ---------------------------------------------------------
-st.markdown("""
-    <style>
-    /* Estilo global da página */
-    .main {
-        background-color: #FAFAFA;
-    }
-    
-    /* Card Container */
-    .wine-card {
-        background-color: #FFFFFF;
-        border: 1px solid #E5E7EB;
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 16px;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
-        transition: all 0.2s ease-in-out;
-    }
-    .wine-card:hover {
-        border-color: #CBD5E1;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
-    }
-    
-    /* Títulos */
-    .wine-title {
-        font-size: 1.15rem;
-        font-weight: 600;
-        color: #0F172A;
-        margin: 0;
-        padding: 0;
-    }
-    
-    /* Subtítulos e Detalhes */
-    .wine-details {
-        font-size: 0.875rem;
-        color: #64748B;
-        margin-top: 6px;
-    }
-    
-    /* Badges de Tipo de Vinho */
-    .badge-tinto {
-        background-color: #FEE2E2;
-        color: #991B1B;
-        padding: 3px 10px;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        display: inline-block;
-    }
-    .badge-branco {
-        background-color: #FEF3C7;
-        color: #92400E;
-        padding: 3px 10px;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        display: inline-block;
-    }
-    .badge-rose {
-        background-color: #FCE7F3;
-        color: #9D174D;
-        padding: 3px 10px;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        display: inline-block;
-    }
-    .badge-espumante {
-        background-color: #CCFBF1;
-        color: #115E59;
-        padding: 3px 10px;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        display: inline-block;
-    }
-    .badge-safra {
-        background-color: #F1F5F9;
-        color: #334155;
-        padding: 3px 10px;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 500;
-        display: inline-block;
-        margin-left: 6px;
-    }
-    
-    /* Ícone de Localização */
-    .location-tag {
-        color: #4A0E17;
-        font-weight: 600;
-        font-size: 0.9rem;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-    
-    /* Suprimir rodapés nativos */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    </style>
-""", unsafe_allow_html=True)
+# --- CONFIGURAÇÕES DO GALPÃO ---
+NOME_ARQUIVO = "estoque_galpao.json"
 
-ARQUIVO_BANCO = "estoque_galpao.json"
+# URL OFICIAL DO APLICATIVO
+URL_APLICATIVO = "https://estoquegalpaopremiumwines-wpktxhltrgjranr6ujp7yi.streamlit.app"
 
-# ---------------------------------------------------------
-# BANCO DE DADOS (JSON)
-# ---------------------------------------------------------
+NOME_DEV = "Vagner Souza"
+FONE_DEV = "(31) 98968-4010"
+
+LISTA_CORREDORES = [f"Corredor {i:02d}" for i in range(1, 26)]
+LISTA_PALLETS = [f"Pallet {i:02d}" for i in range(1, 26)]
+LISTA_LADOS = ["Direito", "Esquerdo", "Centro / Único"]
+
+ANOS_SAFRA = [str(ano) for ano in range(2026, 1989, -1)]
+OPCOES_SAFRA = ["Sem Safra (NV)", "Outra / Mais antiga"] + ANOS_SAFRA
+
+OPCOES_CAIXA = [
+    "24 garrafas",
+    "12 garrafas",
+    "6 garrafas",
+    "3 garrafas",
+    "1 garrafa",
+    "Outra quantidade",
+]
+
+estoque_padrao = [
+    {
+        "nome": "Falérnia Reserva",
+        "tipo": "Tinto",
+        "safra": "2021",
+        "pallet": "Corredor 01 - Pallet 01",
+        "lado": "Direito",
+        "caixa": "12 garrafas",
+        "volume": "750ml",
+    },
+    {
+        "nome": "Volpaia Chianti (375ml)",
+        "tipo": "Tinto",
+        "safra": "2020",
+        "pallet": "Corredor 02 - Pallet 01",
+        "lado": "Esquerdo",
+        "caixa": "24 garrafas",
+        "volume": "375ml",
+    },
+    {
+        "nome": "Stoneburn Sauvignon Blanc",
+        "tipo": "Branco",
+        "safra": "2022",
+        "pallet": "Corredor 03 - Pallet 04",
+        "lado": "Direito",
+        "caixa": "12 garrafas",
+        "volume": "750ml",
+    },
+]
+
+
 def carregar_dados():
-    if not os.path.exists(ARQUIVO_BANCO):
-        dados_iniciais = [
-            {
-                "id": 1,
-                "nome": "Château Margaux Premier Grand Cru",
-                "tipo": "Tinto",
-                "safra": "2015",
-                "volume": "750ml",
-                "lado": "A",
-                "caixa": "CX-102",
-                "pallet": "Corredor 01 - Pallet 01",
-                "quantidade": 24
-            },
-            {
-                "id": 2,
-                "nome": "Puligny-Montrachet Domaine",
-                "tipo": "Branco",
-                "safra": "2020",
-                "volume": "750ml",
-                "lado": "B",
-                "caixa": "CX-205",
-                "pallet": "Corredor 01 - Pallet 02",
-                "quantidade": 12
-            },
-            {
-                "id": 3,
-                "nome": "Dom Pérignon Vintage",
-                "tipo": "Espumante",
-                "safra": "2012",
-                "volume": "750ml",
-                "lado": "A",
-                "caixa": "CX-014",
-                "pallet": "Corredor 02 - Pallet 01",
-                "quantidade": 36
-            }
-        ]
-        salvar_dados(dados_iniciais)
-        return dados_iniciais
+    if os.path.exists(NOME_ARQUIVO):
+        try:
+            with open(NOME_ARQUIVO, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+                if isinstance(dados, list) and len(dados) > 0:
+                    return dados
+        except Exception:
+            pass
+    return [dict(item) for item in estoque_padrao]
+
+
+def salvar_dados(estoque):
     try:
-        with open(ARQUIVO_BANCO, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
+        with open(NOME_ARQUIVO, "w", encoding="utf-8") as f:
+            json.dump(estoque, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        st.error(f"Erro ao salvar dados: {e}")
 
-def salvar_dados(dados):
-    with open(ARQUIVO_BANCO, "w", encoding="utf-8") as f:
-        json.dump(dados, f, ensure_ascii=False, indent=4)
 
-def gerar_qr_code(link_url):
-    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=2)
-    qr.add_data(link_url)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    return buffer.getvalue()
+# Inicializa a sessão do estoque
+if "estoque" not in st.session_state:
+    st.session_state.estoque = carregar_dados()
 
-def get_badge_class(tipo):
-    mapping = {
-        "Tinto": "badge-tinto",
-        "Branco": "badge-branco",
-        "Rosé": "badge-rose",
-        "Espumante": "badge-espumante"
-    }
-    return mapping.get(tipo, "badge-safra")
+# --- 🎯 LEITURA DO QR CODE (PEGA O PALLET DA URL) ---
+query_params = st.query_params
 
-# ---------------------------------------------------------
-# INICIALIZAÇÃO
-# ---------------------------------------------------------
-dados_estoque = carregar_dados()
-params = st.query_params
-pallet_url = params.get("pallet") or params.get("p")
+# Suporta tanto ?pallet= quanto ?p=
+pallet_qr = query_params.get("pallet") or query_params.get("p")
 
-# ---------------------------------------------------------
-# MODO 1: LEITURA DO QR CODE (TELA ESTILIZADA COMO REACT)
-# ---------------------------------------------------------
-if pallet_url:
-    # Cabeçalho da leitura
-    col_h1, col_h2 = st.columns([3, 1])
-    with col_h1:
-        st.markdown("""
-            <div style="display: flex; align-items: center; gap: 8px; color: #16A34A; margin-bottom: 4px;">
-                <span style="font-size: 1.2rem;">CheckCircle2</span>
-                <span style="font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">QR Code lido com sucesso</span>
-            </div>
-        """, unsafe_allow_html=True)
-        st.markdown(f"<h1 style='font-size: 2.2rem; font-weight: 700; color: #0F172A; margin: 0;'>Vinhos alocados em <span style='color: #4A0E17;'>{pallet_url}</span></h1>", unsafe_allow_html=True)
-    
-    with col_h2:
-        st.write("")
-        st.write("")
-        if st.button("⬅️ Ver todo o estoque", use_container_width=True):
-            st.query_params.clear()
-            st.rerun()
+if pallet_qr:
+    st.markdown("---")
+    st.success("📱 **QR CODE LIDO COM SUCESSO!**")
+    st.header(f"📦 Vinhos Alocados em: **{pallet_qr}**")
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    # Filtra os vinhos ignorando maiúsculas/minúsculas e espaços extras
+    vinhos_encontrados = []
+    for v in st.session_state.estoque:
+        p_estoque = str(v.get("pallet", "")).strip().lower()
+        p_busca = str(pallet_qr).strip().lower()
+        if p_busca in p_estoque or p_estoque in p_busca:
+            vinhos_encontrados.append(v)
 
-    # Filtragem
-    termo = pallet_url.strip().lower()
-    encontrados = [
-        v for v in dados_estoque 
-        if termo in str(v.get("pallet", "")).lower() or str(v.get("pallet", "")).lower() in termo
-    ]
-
-    # Lista de resultados no formato de Cards
-    if not encontrados:
-        st.markdown(f"""
-            <div class="wine-card" style="text-align: center; padding: 40px 20px;">
-                <p style="color: #64748B; margin: 0;">🍷 Nenhum vinho cadastrado em <strong>{pallet_url}</strong> até o momento.</p>
-            </div>
-        """, unsafe_allow_html=True)
+    if vinhos_encontrados:
+        for v in vinhos_encontrados:
+            with st.container():
+                st.markdown(
+                    f"### 🍷 **{v.get('nome')}**\n"
+                    f"* **Safra:** {v.get('safra')} | **Lado:** {v.get('lado')}\n"
+                    f"* **Caixa:** {v.get('caixa')} | **Volume:** {v.get('volume')}"
+                )
+                st.markdown("---")
     else:
-        for v in encontrados:
-            tipo_class = get_badge_class(v.get("tipo", ""))
-            tipo_html = f'<span class="{tipo_class}">{v.get("tipo", "")}</span>' if v.get("tipo") else ""
-            safra_html = f'<span class="badge-safra">Safra {v.get("safra")}</span>' if v.get("safra") else ""
+        st.warning(
+            f"⚠️ Nenhum vinho cadastrado em **{pallet_qr}** até o momento."
+        )
 
-            st.markdown(f"""
-                <div class="wine-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
-                        <div>
-                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                <h3 class="wine-title">{v.get("nome", "Sem nome")}</h3>
-                                {tipo_html}
-                                {safra_html}
-                            </div>
-                            <div class="wine-details">
-                                Lado: <strong>{v.get("lado", "—")}</strong> &nbsp;·&nbsp; 
-                                Caixa: <strong>{v.get("caixa", "—")}</strong> &nbsp;·&nbsp; 
-                                Volume: <strong>{v.get("volume", "—")}</strong> &nbsp;·&nbsp; 
-                                Qtd: <strong>{v.get("quantidade", 0)} garrafas</strong>
-                            </div>
-                        </div>
-                        <div class="location-tag">
-                            📍 {v.get("pallet", "—")}
-                        </div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-
+    if st.button("⬅️ Ver Todo o Estoque do Galpão"):
+        st.query_params.clear()
+        st.rerun()
     st.stop()
 
-# ---------------------------------------------------------
-# MODO 2: PAINEL COMPLETO
-# ---------------------------------------------------------
-st.sidebar.title("🍷 Menu Galpão")
-opcao_menu = st.sidebar.radio("Selecione:", ["📦 Visualizar Estoque", "➕ Cadastrar Vinho", "🔲 Gerar QR Codes", "📊 Relatórios"])
+# --- TÍTULO E LOGO ---
+col_logo, col_titulo = st.columns([1, 4])
 
-url_app_base = st.sidebar.text_input(
-    "URL do App (para os QR Codes):", 
-    value="https://mapa-estoque-galpao-premium-vbewrgwbe5ktw8ptefwxmf.streamlit.app"
+nomes_logo = [
+    "PremiumWines_OG-Image.jpg",
+    "logo.jpg",
+    "logo.png",
+    "logo.jpeg",
+    "logo.webp",
+]
+arquivo_logo = None
+for arquivo in nomes_logo:
+    if os.path.exists(arquivo):
+        arquivo_logo = arquivo
+        break
+
+with col_logo:
+    if arquivo_logo:
+        st.image(arquivo_logo, use_container_width=True)
+    else:
+        st.title("🍷")
+
+with col_titulo:
+    st.title("MAPA ESTOQUE GALPÃO PREMIUM")
+    st.caption("Sistema de Localização de vinhos do Galpão")
+
+st.markdown("---")
+
+# --- MENU LATERAL ---
+st.sidebar.markdown("### 🏬 Galpão Principal")
+
+menu = st.sidebar.radio(
+    "📌 Escolha uma opção:",
+    [
+        "1. Buscar vinho",
+        "2. Ver todos os vinhos",
+        "3. Cadastrar novo vinho",
+        "4. Editar vinho existente",
+        "5. Excluir vinho",
+        "6. Exportar planilha (CSV)",
+        "7. Gerar QR Code do Pallet",
+    ],
 )
 
-if opcao_menu == "📦 Visualizar Estoque":
-    st.markdown("<h2 style='color: #4A0E17;'>📋 Lista Geral de Produtos</h2>", unsafe_allow_html=True)
-    
-    col_f1, col_f2 = st.columns([2, 1])
-    with col_f1:
-        busca = st.text_input("🔍 Buscar por Nome, Pallet ou Caixa:", "")
-    with col_f2:
-        filtro_tipo = st.selectbox("Filtrar por Tipo:", ["Todos", "Tinto", "Branco", "Rosé", "Espumante"])
+st.sidebar.markdown("---")
+st.sidebar.markdown(f"👨‍💻 **Desenvolvido por:** {NOME_DEV}")
+st.sidebar.markdown(f"📞 **Contato:** {FONE_DEV}")
 
-    produtos_filtrados = dados_estoque
-    if filtro_tipo != "Todos":
-        produtos_filtrados = [p for p in produtos_filtrados if p.get("tipo") == filtro_tipo]
-    
-    if busca:
-        b = busca.lower()
-        produtos_filtrados = [
-            p for p in produtos_filtrados 
-            if b in p.get("nome", "").lower() or b in p.get("pallet", "").lower() or b in p.get("caixa", "").lower()
+# 1. BUSCAR VINHO
+if menu == "1. Buscar vinho":
+    st.header("🔍 BUSCAR VINHO NO GALPÃO")
+
+    sub_op = st.radio(
+        "Como deseja buscar?",
+        ["Por Nome", "Por Tipo", "Por Safra", "Por Pallet / Corredor"],
+    )
+
+    termo = (
+        st.text_input(
+            "🔎 Digite o termo de busca (Ex: Corredor 01 ou Falernia):"
+        )
+        .strip()
+        .lower()
+    )
+
+    if termo:
+        resultados = []
+        for v in st.session_state.estoque:
+            nome_vinho = str(v.get("nome", "")).lower()
+            tipo_vinho = str(v.get("tipo", "")).lower()
+            safra_vinho = str(v.get("safra", "")).lower()
+            pallet_vinho = str(v.get("pallet", "")).lower()
+
+            if sub_op == "Por Nome" and termo in nome_vinho:
+                resultados.append(v)
+            elif sub_op == "Por Tipo" and termo in tipo_vinho:
+                resultados.append(v)
+            elif sub_op == "Por Safra" and termo in safra_vinho:
+                resultados.append(v)
+            elif sub_op == "Por Pallet / Corredor" and termo in pallet_vinho:
+                resultados.append(v)
+
+        if not resultados:
+            st.warning(f"⚠️ Nenhum vinho encontrado para '{termo}'.")
+        else:
+            st.success(f"Encontrado(s) {len(resultados)} resultado(s):")
+            for v in resultados:
+                lado_txt = (
+                    f" - Lado {v.get('lado')}" if v.get("lado") else ""
+                )
+                safra_txt = f" ({v.get('safra')})" if v.get("safra") else ""
+                with st.expander(
+                    f"🍷 {v.get('nome', 'Sem nome')}{safra_txt} [{v.get('tipo', 'S/T')}] ➔ 📍 {v.get('pallet', 'S/P')}{lado_txt}",
+                    expanded=True,
+                ):
+                    st.write(
+                        f"**Localização no Galpão:** {v.get('pallet', 'N/I')}"
+                    )
+                    st.write(
+                        f"**Lado do Corredor:** {v.get('lado', 'Não informado')}"
+                    )
+                    st.write(f"**Safra:** {v.get('safra', 'N/I')}")
+                    st.write(f"**Caixa:** {v.get('caixa', 'N/I')}")
+                    st.write(f"**Volume:** {v.get('volume', 'N/I')}")
+
+# 2. VER TODOS OS VINHOS
+elif menu == "2. Ver todos os vinhos":
+    st.header("🍷 ESTOQUE COMPLETO DO GALPÃO")
+
+    if not st.session_state.estoque:
+        st.warning("Nenhum vinho cadastrado no galpão.")
+    else:
+        ordem = st.radio(
+            "Como deseja visualizar?",
+            [
+                "Ordem padrão",
+                "Ordem Alfabética (Nome)",
+                "Agrupado por Localização (Corredor/Pallet)",
+            ],
+        )
+
+        lista_exibicao = [dict(v) for v in st.session_state.estoque]
+
+        if ordem == "Ordem Alfabética (Nome)":
+            lista_exibicao.sort(key=lambda x: str(x.get("nome", "")).lower())
+        elif ordem == "Agrupado por Localização (Corredor/Pallet)":
+            lista_exibicao.sort(key=lambda x: str(x.get("pallet", "")).lower())
+
+        df = pd.DataFrame(lista_exibicao)
+        colunas_map = {
+            "nome": "Nome do Vinho",
+            "tipo": "Tipo",
+            "safra": "Safra",
+            "pallet": "Localização / Pallet",
+            "lado": "Lado do Corredor",
+            "caixa": "Caixa",
+            "volume": "Volume",
+        }
+        df.rename(columns=colunas_map, inplace=True)
+        st.dataframe(df, use_container_width=True)
+
+# 3. CADASTRAR VINHO
+elif menu == "3. Cadastrar novo vinho":
+    st.header("➕ CADASTRAR VINHO NO GALPÃO")
+
+    nome = st.text_input("Nome do vinho / Marca:").strip()
+
+    outras_safras = []
+    if nome:
+        outras_safras = [
+            v
+            for v in st.session_state.estoque
+            if str(v.get("nome", "")).strip().lower() == nome.lower()
         ]
 
-    for p in produtos_filtrados:
-        tipo_class = get_badge_class(p.get("tipo", ""))
-        tipo_html = f'<span class="{tipo_class}">{p.get("tipo", "")}</span>' if p.get("tipo") else ""
-        safra_html = f'<span class="badge-safra">Safra {p.get("safra")}</span>' if p.get("safra") else ""
-        link_qr = f"{url_app_base}/?pallet={p.get('pallet', '')}"
+    if outras_safras:
+        st.info(
+            f"ℹ️ **Atenção:** Este vinho já possui **{len(outras_safras)} registro(s)** no galpão:"
+        )
+        for item in outras_safras:
+            st.write(
+                f"- **Safra {item.get('safra', 'N/I')}** ➔ Local: `{item.get('pallet', 'N/I')}` (Lado: {item.get('lado', 'N/I')})"
+            )
 
-        st.markdown(f"""
-            <div class="wine-card">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
-                    <div>
-                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                            <h3 class="wine-title">{p.get("nome")}</h3>
-                            {tipo_html}
-                            {safra_html}
-                        </div>
-                        <div class="wine-details">
-                            Caixa: <strong>{p.get("caixa", "—")}</strong> (Lado {p.get("lado", "—")}) &nbsp;·&nbsp; 
-                            Volume: <strong>{p.get("volume", "—")}</strong> &nbsp;·&nbsp; 
-                            Estoque: <strong>{p.get("quantidade", 0)} un.</strong>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="location-tag" style="margin-bottom: 6px;">📍 {p.get("pallet", "—")}</div>
-                        <a href="{link_qr}" target="_blank" style="font-size: 0.8rem; color: #0284C7; text-decoration: none;">🔗 Simular QR Code</a>
-                    </div>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
-elif opcao_menu == "➕ Cadastrar Vinho":
-    st.markdown("<h2 style='color: #4A0E17;'>➕ Novo Cadastro</h2>", unsafe_allow_html=True)
     with st.form("form_cadastrar"):
-        c1, c2 = st.columns(2)
-        with c1:
-            nome = st.text_input("Nome do Vinho *")
-            tipo = st.selectbox("Tipo *", ["Tinto", "Branco", "Rosé", "Espumante"])
-            safra = st.text_input("Safra", "2021")
-            volume = st.text_input("Volume", "750ml")
-        with c2:
-            pallet = st.text_input("Pallet / Localização *", "Corredor 01 - Pallet 01")
-            caixa = st.text_input("Caixa", "CX-100")
-            lado = st.selectbox("Lado", ["A", "B", "C", "D"])
-            quantidade = st.number_input("Quantidade", min_value=1, value=12)
+        col_tipo, col_safra = st.columns(2)
+        with col_tipo:
+            tipo = st.text_input(
+                "Tipo (Tinto, Branco, Rosé, Espumante...):"
+            ).strip()
+        with col_safra:
+            safra_opcao = st.selectbox("📅 Safra:", OPCOES_SAFRA)
 
-        if st.form_submit_button("Salvar no Estoque"):
-            if nome and pallet:
-                novo_id = max([item.get("id", 0) for item in dados_estoque], default=0) + 1
-                dados_estoque.append({
-                    "id": novo_id, "nome": nome, "tipo": tipo, "safra": safra,
-                    "volume": volume, "lado": lado, "caixa": caixa, "pallet": pallet,
-                    "quantidade": int(quantidade)
-                })
-                salvar_dados(dados_estoque)
-                st.success(f"Vinho '{nome}' cadastrado com sucesso!")
+        safra_custom = ""
+        if safra_opcao == "Outra / Mais antiga":
+            safra_custom = st.text_input("Digite o ano da safra (Ex: 1985):")
+
+        col_corr, col_pal, col_lad = st.columns(3)
+        with col_corr:
+            sel_corredor = st.selectbox("🛣️ Corredor:", LISTA_CORREDORES)
+        with col_pal:
+            sel_pallet = st.selectbox("📦 Pos./Pallet:", LISTA_PALLETS)
+        with col_lad:
+            lado = st.selectbox("↔️ Lado:", LISTA_LADOS)
+
+        caixa_opcao = st.selectbox(
+            "📦 Quantidade de garrafas por caixa:", OPCOES_CAIXA
+        )
+
+        caixa_custom = ""
+        if caixa_opcao == "Outra quantidade":
+            caixa_custom = st.text_input("Digite a quantidade de garrafas:")
+
+        vol_opcao = st.selectbox(
+            "🧪 Volume / Tamanho da garrafa:",
+            ["750ml", "375ml", "1500ml (Magnum)", "Outro valor"],
+        )
+
+        volume_custom = ""
+        if vol_opcao == "Outro valor":
+            volume_custom = st.text_input("Digite o volume customizado:")
+
+        submit = st.form_submit_button("✅ Salvar no Galpão")
+
+        if submit:
+            safra_final = (
+                safra_custom
+                if safra_opcao == "Outra / Mais antiga"
+                else safra_opcao
+            )
+            caixa_final = (
+                caixa_custom
+                if caixa_opcao == "Outra quantidade"
+                else caixa_opcao
+            )
+            volume_final = (
+                volume_custom if vol_opcao == "Outro valor" else vol_opcao
+            )
+
+            pallet_final = f"{sel_corredor} - {sel_pallet}"
+
+            if nome and tipo:
+                novo_vinho = {
+                    "nome": nome,
+                    "tipo": tipo,
+                    "safra": safra_final if safra_final else "Sem Safra (NV)",
+                    "pallet": pallet_final,
+                    "lado": lado,
+                    "caixa": caixa_final if caixa_final else "12 garrafas",
+                    "volume": volume_final if volume_final else "750ml",
+                }
+                st.session_state.estoque.append(novo_vinho)
+                salvar_dados(st.session_state.estoque)
+                st.success(
+                    f"✅ '{nome}' ({safra_final}) cadastrado com sucesso em `{pallet_final}`!"
+                )
+                st.rerun()
+            else:
+                st.error("❌ Nome e Tipo são obrigatórios!")
+
+# 4. EDITAR VINHO
+elif menu == "4. Editar vinho existente":
+    st.header("✏️ EDITAR VINHO NO GALPÃO")
+
+    if not st.session_state.estoque:
+        st.warning("Nenhum vinho cadastrado.")
+    else:
+        opcoes = [
+            f"{i + 1}. {v.get('nome', 'Sem nome')} ({v.get('safra', 'S/S')}) - 📍 {v.get('pallet', 'Sem local')}"
+            for i, v in enumerate(st.session_state.estoque)
+        ]
+        idx_selecionado = st.selectbox(
+            "Selecione o vinho que deseja editar:",
+            range(len(opcoes)),
+            format_func=lambda x: opcoes[x],
+        )
+
+        vinho = st.session_state.estoque[idx_selecionado]
+
+        with st.form("form_editar"):
+            novo_nome = st.text_input("Novo Nome:", str(vinho.get("nome", "")))
+
+            col_t, col_s = st.columns(2)
+            with col_t:
+                novo_tipo = st.text_input(
+                    "Novo Tipo:", str(vinho.get("tipo", ""))
+                )
+            with col_s:
+                safra_atual = str(vinho.get("safra", "Sem Safra (NV)"))
+                idx_s = (
+                    OPCOES_SAFRA.index(safra_atual)
+                    if safra_atual in OPCOES_SAFRA
+                    else 0
+                )
+                nova_safra = st.selectbox(
+                    "Nova Safra:", OPCOES_SAFRA, index=idx_s
+                )
+
+            novo_pallet = st.text_input(
+                "Nova Localização:", str(vinho.get("pallet", ""))
+            )
+
+            lado_atual = vinho.get("lado", "Direito")
+            idx_l = (
+                LISTA_LADOS.index(lado_atual)
+                if lado_atual in LISTA_LADOS
+                else 0
+            )
+            novo_lado = st.selectbox("Novo Lado:", LISTA_LADOS, index=idx_l)
+
+            caixa_atual = vinho.get("caixa", "12 garrafas")
+            idx_caixa = (
+                OPCOES_CAIXA.index(caixa_atual)
+                if caixa_atual in OPCOES_CAIXA
+                else 0
+            )
+            nova_caixa = st.selectbox("Caixa:", OPCOES_CAIXA, index=idx_caixa)
+
+            novo_volume = st.text_input(
+                "Volume:", str(vinho.get("volume", "750ml"))
+            )
+
+            submit_edit = st.form_submit_button("💾 Salvar Alterações")
+
+            if submit_edit:
+                st.session_state.estoque[idx_selecionado] = {
+                    "nome": novo_nome,
+                    "tipo": novo_tipo,
+                    "safra": nova_safra,
+                    "pallet": novo_pallet,
+                    "lado": novo_lado,
+                    "caixa": nova_caixa,
+                    "volume": novo_volume,
+                }
+                salvar_dados(st.session_state.estoque)
+                st.success(f"✅ '{novo_nome}' atualizado com sucesso!")
                 st.rerun()
 
-elif opcao_menu == "🔲 Gerar QR Codes":
-    st.markdown("<h2 style='color: #4A0E17;'>🔲 Gerador de QR Code</h2>", unsafe_allow_html=True)
-    pallets = sorted(list(set([item.get("pallet", "") for item in dados_estoque if item.get("pallet")])))
-    pallet_sel = st.selectbox("Selecione o Pallet:", pallets)
-    if pallet_sel:
-        link = f"{url_app_base}/?pallet={pallet_sel}"
-        qr = gerar_qr_code(link)
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            st.image(qr, width=200)
-        with col2:
-            st.write(f"Link: `{link}`")
-            st.download_button("📥 Baixar Imagem QR Code", qr, file_name=f"{pallet_sel}.png", mime="image/png")
+# 5. EXCLUIR VINHO
+elif menu == "5. Excluir vinho":
+    st.header("🗑️ EXCLUIR VINHO DO GALPÃO")
 
-elif opcao_menu == "📊 Relatórios":
-    st.markdown("<h2 style='color: #4A0E17;'>📊 Resumo do Estoque</h2>", unsafe_allow_html=True)
-    df = pd.DataFrame(dados_estoque)
-    if not df.empty:
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Rótulos Diferentes", len(df))
-        c2.metric("Total Garrafas", int(df["quantidade"].sum()))
-        c3.metric("Pallets Ativos", df["pallet"].nunique())
-        st.dataframe(df, use_container_width=True)
+    if not st.session_state.estoque:
+        st.warning("Nenhum vinho cadastrado.")
+    else:
+        opcoes_excluir = [
+            f"{i + 1}. {v.get('nome', 'Sem nome')} ({v.get('safra', 'NV')}) - 📍 {v.get('pallet', 'Sem local')} ({v.get('lado', 'S/L')})"
+            for i, v in enumerate(st.session_state.estoque)
+        ]
+
+        idx_excluir = st.selectbox(
+            "Selecione o vinho a remover:",
+            range(len(opcoes_excluir)),
+            format_func=lambda x: opcoes_excluir[x],
+        )
+
+        vinho_alvo = st.session_state.estoque[idx_excluir]
+
+        if st.button("❌ Confirmar Exclusão"):
+            nome_removido = vinho_alvo.get("nome", "Vinho")
+            st.session_state.estoque.pop(idx_excluir)
+            salvar_dados(st.session_state.estoque)
+            st.success(f"✅ '{nome_removido}' excluído com sucesso!")
+            st.rerun()
+
+# 6. EXPORTAR PLANILHA
+elif menu == "6. Exportar planilha (CSV)":
+    st.header("📤 EXPORTAR PARA EXCEL (CSV)")
+
+    if st.session_state.estoque:
+        df = pd.DataFrame(st.session_state.estoque)
+        csv_data = df.to_csv(index=False, sep=";").encode("utf-8-sig")
+
+        st.download_button(
+            label="📥 Baixar Planilha do Galpão em Excel / CSV",
+            data=csv_data,
+            file_name="estoque_galpao.csv",
+            mime="text/csv",
+        )
+    else:
+        st.warning("Nenhum dado para exportar.")
+
+# 7. GERAR QR CODE DO PALLET
+elif menu == "7. Gerar QR Code do Pallet":
+    st.header("📱 GERADOR DE ETIQUETAS QR CODE")
+    st.write(
+        "Gere QR Codes inteligentes para colar nos pallets e consultar os vinhos na hora usando a câmera do celular."
+    )
+
+    c1, c2 = st.columns(2)
+    with c1:
+        qr_corr = st.selectbox("Selecione o Corredor:", LISTA_CORREDORES)
+    with c2:
+        qr_pal = st.selectbox("Selecione o Pallet:", LISTA_PALLETS)
+
+    pallet_alvo = f"{qr_corr} - {qr_pal}"
+
+    vinhos_no_pallet = [
+        v
+        for v in st.session_state.estoque
+        if str(v.get("pallet", "")).strip().lower() == pallet_alvo.lower()
+    ]
+
+    st.markdown("---")
+    st.subheader(f"📍 Pallet Selecionado: `{pallet_alvo}`")
+
+    if vinhos_no_pallet:
+        st.success(
+            f"📦 Encontrado(s) {len(vinhos_no_pallet)} produto(s) neste pallet:"
+        )
+        for v in vinhos_no_pallet:
+            st.write(
+                f"- **{v.get('nome')}** | Safra: **{v.get('safra')}** | Lado: {v.get('lado')} | Cx: {v.get('caixa')}"
+            )
+    else:
+        st.info("ℹ️ NENHUM vinho cadastrado neste pallet no momento.")
+
+    link_pallet_especifico = (
+        f"{URL_APLICATIVO}/?pallet={urllib.parse.quote(pallet_alvo)}"
+    )
+    url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(link_pallet_especifico)}"
+
+    st.markdown("### 🖨️ QR Code de Acesso Direto ao Pallet:")
+    st.image(url_qr, caption=f"Etiqueta QR Code para: {pallet_alvo}", width=250)
