@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # ==========================================
-# 2. MENU LATERAL (SIDEBAR)
+# 2. MENU LATERAL DE NAVEGAÇÃO
 # ==========================================
 st.sidebar.markdown(
     """
@@ -29,7 +29,7 @@ menu = st.sidebar.radio(
     "Navegação:",
     [
         "➕ Cadastrar Novo Pallet",
-        "📊 Dashboard & Consulta",
+        "🔍 Buscar & Dashboard",
         "🖨️ Gerar QR Code de Pallet",
     ],
 )
@@ -54,7 +54,7 @@ if "estoque" not in st.session_state:
 # 4. PÁGINAS DO APLICATIVO
 # ==========================================
 
-# --- PÁGINA 1: CADASTRAR PALLET (SEU FORMULÁRIO COMPLETO + FOTO) ---
+# --- PÁGINA 1: CADASTRAR PALLET (TODOS OS CAMPOS + FOTO) ---
 if menu == "➕ Cadastrar Novo Pallet":
   st.title("Pallet")
 
@@ -99,7 +99,7 @@ if menu == "➕ Cadastrar Novo Pallet":
     st.subheader("📸 Foto do Vinho / Rótulo")
 
     modo_foto = st.radio(
-        "Adicionar foto via:",
+        "Escolha como adicionar a foto:",
         ["📁 Galeria / Arquivo", "📷 Câmera"],
         horizontal=True,
     )
@@ -107,7 +107,7 @@ if menu == "➕ Cadastrar Novo Pallet":
     foto_vinho = None
     if modo_foto == "📁 Galeria / Arquivo":
       foto_vinho = st.file_uploader(
-          "Selecione a imagem do vinho", type=["jpg", "jpeg", "png"]
+          "Selecione a foto do vinho", type=["jpg", "jpeg", "png"]
       )
     else:
       foto_vinho = st.camera_input("Tire a foto do rótulo")
@@ -138,73 +138,90 @@ if menu == "➕ Cadastrar Novo Pallet":
       else:
         st.error("⚠️ Por favor, informe o Nome do Vinho / Marca.")
 
-# --- PÁGINA 2: DASHBOARD & CONSULTA ---
-elif menu == "📊 Dashboard & Consulta":
-  st.title("📊 Consulta de Estoque & Pallets")
+# --- PÁGINA 2: BUSCA DE VINHO & DASHBOARD COMPLETO ---
+elif menu == "🔍 Buscar & Dashboard":
+  st.title("🔍 Busca de Vinho & Consulta de Estoque")
 
-  # Métricas resumo
-  col1, col2, col3 = st.columns(3)
-  col1.metric("Total Registrados", len(st.session_state["estoque"]))
-  col2.metric(
-      "Corredores em Uso", st.session_state["estoque"]["Corredor"].nunique()
+  # Métricas do topo
+  c1, c2, c3 = st.columns(3)
+  c1.metric("Total de Registros", len(st.session_state["estoque"]))
+  c2.metric(
+      "Corredores Ativos", st.session_state["estoque"]["Corredor"].nunique()
   )
-  col3.metric(
+  c3.metric(
       "Marcas / Vinhos", st.session_state["estoque"]["Vinho"].nunique()
   )
 
   st.markdown("---")
-  st.subheader("🔍 Buscar Pallet / Vinho")
-  busca = st.text_input("Digite o nome do vinho, corredor ou pallet:")
 
-  df_base = st.session_state["estoque"]
+  # Campo de Busca Direta por Vinho / Marca ou Posição
+  st.subheader("🔎 Digite para pesquisar:")
+  termo_busca = st.text_input(
+      "Buscar por Nome do Vinho, Tipo, Corredor ou Pallet:",
+      placeholder="Ex: Cabernet, Tinto, Corredor 01...",
+  )
 
-  if busca:
+  df_resultado = st.session_state["estoque"]
+
+  if termo_busca.strip():
+    termo = termo_busca.strip()
     mask = (
-        df_base["Vinho"].str.contains(busca, case=False, na=False)
-        | df_base["Corredor"].str.contains(busca, case=False, na=False)
-        | df_base["Pallet"].str.contains(busca, case=False, na=False)
+        df_resultado["Vinho"].str.contains(termo, case=False, na=False)
+        | df_resultado["Tipo"].str.contains(termo, case=False, na=False)
+        | df_resultado["Corredor"].str.contains(termo, case=False, na=False)
+        | df_resultado["Pallet"].str.contains(termo, case=False, na=False)
+        | df_resultado["Safra"].str.contains(termo, case=False, na=False)
     )
-    df_base = df_base[mask]
+    df_resultado = df_resultado[mask]
 
-  # Exibição dos itens em cards com fotos
-  if not df_base.empty:
-    for idx, row in df_base.iterrows():
+  st.markdown("### 📋 Resultados encontrados:")
+
+  if not df_resultado.empty:
+    for idx, row in df_resultado.iterrows():
       with st.container():
-        c1, c2 = st.columns([3, 1])
-        with c1:
-          st.markdown(f"### 🍷 {row['Vinho']}")
+        col_info, col_foto = st.columns([3, 1])
+
+        with col_info:
+          st.markdown(f"#### 🍷 **{row['Vinho']}** ({row['Tipo']})")
           st.write(
-              f"**Localização:** {row['Corredor']} | {row['Pallet']} | Lado"
+              f"📌 **Localização:** {row['Corredor']} | {row['Pallet']} | Lado:"
               f" {row['Lado']}"
           )
           st.write(
-              f"**Detalhes:** Tipo: {row['Tipo']} | Safra: {row['Safra']} |"
-              f" Caixas: {row['Garrafas_Caixa']} | Vol: {row['Volume']}"
+              f"📦 **Detalhes:** Safra: {row['Safra']} | Embalagem:"
+              f" {row['Garrafas_Caixa']} | Volume: {row['Volume']}"
           )
-        with c2:
+
+        with col_foto:
           if row["Foto"] is not None:
-            st.image(row["Foto"], caption="Rótulo", width=120)
+            st.image(row["Foto"], caption="Rótulo Cadastrado", width=130)
           else:
-            st.caption("Sem foto")
+            st.info("Sem foto")
+
         st.markdown("---")
   else:
-    st.info("Nenhum pallet encontrado.")
+    st.warning("⚠️ Nenhum vinho ou pallet encontrado com o termo digitado.")
 
 # --- PÁGINA 3: GERADOR DE QR CODE ---
 elif menu == "🖨️ Gerar QR Code de Pallet":
-  st.title("🖨️ Gerador de QR Code de Localização")
+  st.title("🖨️ Gerador de QR Code do Pallet")
 
   if not st.session_state["estoque"].empty:
-    opcoes = [
-        f"{row['Corredor']} - {row['Pallet']} ({row['Vinho']})"
+    lista_opcoes = [
+        f"{row['Vinho']} - {row['Corredor']} ({row['Pallet']})"
         for idx, row in st.session_state["estoque"].iterrows()
     ]
-    selecao = st.selectbox("Escolha o item para gerar o QR Code:", opcoes)
 
-    idx_sel = opcoes.index(selecao)
-    item = st.session_state["estoque"].iloc[idx_sel]
+    item_selecionado = st.selectbox(
+        "Selecione o Vinho/Pallet para gerar a etiqueta:", lista_opcoes
+    )
+    idx = lista_opcoes.index(item_selecionado)
+    dados = st.session_state["estoque"].iloc[idx]
 
-    conteudo_qr = f"CORREDOR: {item['Corredor']} | PALLET: {item['Pallet']} | VINHO: {item['Vinho']}"
+    conteudo_qr = (
+        f"VINHO: {dados['Vinho']}\nCORREDOR: {dados['Corredor']}\nPALLET:"
+        f" {dados['Pallet']}\nLADO: {dados['Lado']}"
+    )
 
     qr = qrcode.QRCode(version=1, box_size=8, border=2)
     qr.add_data(conteudo_qr)
@@ -213,21 +230,25 @@ elif menu == "🖨️ Gerar QR Code de Pallet":
 
     buf = io.BytesIO()
     img_qr.save(buf, format="PNG")
-    byte_im = buf.getvalue()
+    bytes_qr = buf.getvalue()
 
-    col_qr, col_info = st.columns([1, 2])
+    col_qr, col_detalhes = st.columns([1, 2])
     with col_qr:
-      st.image(byte_im, caption=f"{item['Corredor']} - {item['Pallet']}")
+      st.image(
+          bytes_qr, caption=f"Etiqueta QR Code - {dados['Pallet']}", width=200
+      )
       st.download_button(
-          "💾 Baixar QR Code",
-          data=byte_im,
-          file_name=f"qrcode_{item['Pallet']}.png",
+          "💾 Baixar QR Code (PNG)",
+          data=bytes_qr,
+          file_name=f"qrcode_{dados['Pallet']}.png",
           mime="image/png",
       )
-    with col_info:
-      st.write(f"**Vinho:** {item['Vinho']}")
-      st.write(f"**Corredor:** {item['Corredor']}")
-      st.write(f"**Pallet:** {item['Pallet']}")
-      st.write(f"**Lado:** {item['Lado']}")
+
+    with col_detalhes:
+      st.markdown(f"### 🍷 {dados['Vinho']}")
+      st.write(f"**Tipo:** {dados['Tipo']}")
+      st.write(f"**Safra:** {dados['Safra']}")
+      st.write(f"**Posição:** {dados['Corredor']} | {dados['Pallet']}")
+      st.write(f"**Caixa:** {dados['Garrafas_Caixa']} ({dados['Volume']})")
   else:
-    st.warning("Nenhum pallet cadastrado ainda.")
+    st.info("Nenhum vinho cadastrado no momento.")
