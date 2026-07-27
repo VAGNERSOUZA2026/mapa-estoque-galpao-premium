@@ -14,8 +14,8 @@ st.set_page_config(
 # --- CONFIGURAÇÕES DO GALPÃO ---
 NOME_ARQUIVO = "estoque_galpao.json"
 
-# URL OFICIAL DO APLICATIVO
-URL_APLICATIVO = "https://estoquegalpaopremiumwines-wpktxhltrgjranr6ujp7yi.streamlit.app"
+# URL OFICIAL DO SEU APLICATIVO NO STREAMLIT CLOUD
+URL_APLICATIVO = "https://mapa-estoque-galpao-premium-vbewrgwbe5ktw8ptefwxmf.streamlit.app"
 
 NOME_DEV = "Vagner Souza"
 FONE_DEV = "(31) 98968-4010"
@@ -526,6 +526,7 @@ elif menu == "7. Gerar QR Code do Pallet":
     else:
         st.info("ℹ️ NENHUM vinho cadastrado neste pallet no momento.")
 
+    # Constrói o link com a URL exata do seu app no Streamlit Cloud
     link_pallet_especifico = (
         f"{URL_APLICATIVO}/?pallet={urllib.parse.quote(pallet_alvo)}"
     )
@@ -533,3 +534,4 @@ elif menu == "7. Gerar QR Code do Pallet":
 
     st.markdown("### 🖨️ QR Code de Acesso Direto ao Pallet:")
     st.image(url_qr, caption=f"Etiqueta QR Code para: {pallet_alvo}", width=250)
+    st.info(f"🔗 Link gerado: `{link_pallet_especifico}`")
