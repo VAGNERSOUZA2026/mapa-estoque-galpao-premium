@@ -206,7 +206,7 @@ with st.sidebar:
   )
 
   menu = st.radio(
-      "Menu Principais:",
+      "Menu Principal:",
       [
           "🔍 Buscar vinho",
           "🍷 Ver estoque completo",
@@ -551,7 +551,7 @@ elif menu == "📥 Importar planilha (CSV/Excel)":
     except Exception as e:
       st.error(f"Erro ao ler arquivo: {e}")
 
-# 7. EXPORTAR PLANILHA (LOGO APÓS A IMPORTAÇÃO!)
+# 7. EXPORTAR PLANILHA
 elif menu == "📤 Exportar planilha (CSV)":
   st.subheader("📤 Baixar Dados em Planilha")
   if st.session_state.estoque:
@@ -561,9 +561,10 @@ elif menu == "📤 Exportar planilha (CSV)":
     csv = df_exp.to_csv(index=False, sep=";").encode("utf-8-sig")
     st.download_button("📥 Download CSV", csv, "estoque_galpao.csv", "text/csv")
 
-# 8. GERAR QR CODE DO PALLET
+# 8. GERAR QR CODE DO PALLET (COM PRÉVIA DOS VINHOS)
 elif menu == "🏷️ Gerar QR Code do Pallet":
   st.subheader("🏷️ Etiquetas para Pallet")
+
   c1, c2 = st.columns(2)
   with c1:
     qr_corr = st.selectbox("Corredor:", LISTA_CORREDORES)
@@ -571,15 +572,42 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
     qr_pal = st.selectbox("Pallet:", LISTA_PALLETS)
 
   pallet_alvo = f"{qr_corr} - {qr_pal}"
+
+  # Busca vinhos salvos neste pallet especificamente
+  vinhos_no_pallet = [
+      v for v in st.session_state.estoque if v.get("pallet") == pallet_alvo
+  ]
+
+  st.markdown("---")
+
+  # Exibe os vinhos do pallet selecionado
+  if vinhos_no_pallet:
+    st.success(
+        f"📦 **{len(vinhos_no_pallet)} vinho(s)** encontrado(s) em"
+        f" **{pallet_alvo}**:"
+    )
+    for item in vinhos_no_pallet:
+      st.markdown(
+          f"• **{item.get('nome')}** ({item.get('safra')}) — *Lado:"
+          f" {item.get('lado')}*"
+      )
+  else:
+    st.info(f"ℹ️ Nenhum vinho cadastrado em **{pallet_alvo}** no momento.")
+
+  st.markdown("---")
+
+  # Gerador do QR Code
   pallet_encoded = urllib.parse.quote_plus(pallet_alvo)
   link_pallet = (
       f"{URL_APLICATIVO}/?pallet={pallet_encoded}&auth={SENHA_ACESSO}"
   )
   url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(link_pallet)}"
 
-  st.image(url_qr, caption=f"Etiqueta {pallet_alvo}", width=200)
+  st.image(
+      url_qr, caption=f"Etiqueta QR Code — {pallet_alvo}", width=200
+  )
 
-# 9. ESCANEAR QR CODE
+# 9. ESCANEAR QR CODE (CÂMERA TRASEIRA FORÇADA)
 elif menu == "📷 Escanear QR Code":
   st.subheader("📷 Câmera para Leitura de QR Code")
   st.components.v1.html(
@@ -587,10 +615,26 @@ elif menu == "📷 Escanear QR Code":
         <div id="reader" style="width:100%; max-width:380px; margin:auto;"></div>
         <script src="https://unpkg.com/html5-qrcode"></script>
         <script>
-            function onScanSuccess(decodedText) { window.top.location.href = decodedText; }
-            let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 220 });
-            html5QrcodeScanner.render(onScanSuccess);
+            function onScanSuccess(decodedText) { 
+                window.top.location.href = decodedText; 
+            }
+            
+            let html5QrcodeScanner = new Html5QrcodeScanner(
+                "reader", 
+                { 
+                    fps: 10, 
+                    qrbox: 220,
+                    videoConstraints: {
+                        facingMode: { exact: "environment" }
+                    }
+                }
+            );
+            
+            html5QrcodeScanner.render(onScanSuccess).catch(err => {
+                let fallbackScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 220 });
+                fallbackScanner.render(onScanSuccess);
+            });
         </script>
         """,
-      height=440,
+      height=450,
   )
