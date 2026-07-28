@@ -210,6 +210,7 @@ with st.sidebar:
           "🔍 Buscar vinho",
           "🍷 Ver estoque completo",
           "➕ Cadastrar novo vinho",
+          "📥 Importar planilha (CSV/Excel)",
           "✏️ Editar vinho",
           "🗑️ Excluir vinho",
           "📤 Exportar planilha (CSV)",
@@ -440,7 +441,67 @@ elif menu == "➕ Cadastrar novo vinho":
       else:
         st.error("⚠️ Preencha pelo menos o Nome e o Tipo.")
 
-# 4. EDITAR VINHO
+# 4. IMPORTAR PLANILHA (NOVO RECURSO)
+elif menu == "📥 Importar planilha (CSV/Excel)":
+  st.subheader("📥 Carga em Lote por Planilha")
+  st.info(
+      "Suba um arquivo **.csv** ou **.xlsx** contendo as colunas: `nome`,"
+      " `tipo`, `safra`, `pallet`, `lado`, `caixa`, `volume`."
+  )
+
+  arquivo_planilha = st.file_uploader(
+      "Escolha o arquivo CSV ou Excel:", type=["csv", "xlsx"]
+  )
+
+  substituir = st.checkbox(
+      "⚠️ Apagar o estoque atual e substituir por este arquivo (caso desmarcado,"
+      " adicionará ao estoque existente)."
+  )
+
+  if arquivo_planilha is not None:
+    try:
+      if arquivo_planilha.name.endswith(".csv"):
+        # Tenta carregar CSV com separador ; ou ,
+        try:
+          df_import = pd.read_csv(arquivo_planilha, sep=";")
+          if "nome" not in df_import.columns:
+            arquivo_planilha.seek(0)
+            df_import = pd.read_csv(arquivo_planilha, sep=",")
+        except Exception:
+          df_import = pd.read_csv(arquivo_planilha)
+      else:
+        df_import = pd.read_excel(arquivo_planilha)
+
+      st.write("👀 Previa dos dados encontrados:")
+      st.dataframe(df_import.head(10), use_container_width=True)
+
+      if st.button("🚀 Confirmar Importação de Dados", use_container_width=True):
+        novos_itens = df_import.to_dict(orient="records")
+
+        for item in novos_itens:
+          if "foto" not in item or pd.isna(item["foto"]):
+            item["foto"] = None
+          # Converte valores nulos para texto vazio
+          for k, v in item.items():
+            if pd.isna(v):
+              item[k] = ""
+
+        if substituir:
+          st.session_state.estoque = novos_itens
+        else:
+          st.session_state.estoque.extend(novos_itens)
+
+        salvar_dados(st.session_state.estoque)
+        st.success(
+            f"🎉 Sucesso! {len(novos_itens)} vinhos foram adicionados ao"
+            " sistema."
+        )
+        st.rerun()
+
+    except Exception as e:
+      st.error(f"Erro ao ler arquivo: {e}")
+
+# 5. EDITAR VINHO
 elif menu == "✏️ Editar vinho":
   st.subheader("✏️ Alterar Cadastro")
   if st.session_state.estoque:
@@ -472,7 +533,7 @@ elif menu == "✏️ Editar vinho":
         st.success("Atualizado!")
         st.rerun()
 
-# 5. EXCLUIR VINHO
+# 6. EXCLUIR VINHO
 elif menu == "🗑️ Excluir vinho":
   st.subheader("🗑️ Remover do Estoque")
   if st.session_state.estoque:
@@ -491,7 +552,7 @@ elif menu == "🗑️ Excluir vinho":
       st.success("Removido!")
       st.rerun()
 
-# 6. EXPORTAR PLANILHA
+# 7. EXPORTAR PLANILHA
 elif menu == "📤 Exportar planilha (CSV)":
   st.subheader("📤 Baixar Dados em Planilha")
   if st.session_state.estoque:
@@ -501,7 +562,7 @@ elif menu == "📤 Exportar planilha (CSV)":
     csv = df_exp.to_csv(index=False, sep=";").encode("utf-8-sig")
     st.download_button("📥 Download CSV", csv, "estoque_galpao.csv", "text/csv")
 
-# 7. GERAR QR CODE DO PALLET
+# 8. GERAR QR CODE DO PALLET
 elif menu == "🏷️ Gerar QR Code do Pallet":
   st.subheader("🏷️ Etiquetas para Pallet")
   c1, c2 = st.columns(2)
@@ -519,7 +580,7 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
 
   st.image(url_qr, caption=f"Etiqueta {pallet_alvo}", width=200)
 
-# 8. ESCANEAR QR CODE
+# 9. ESCANEAR QR CODE
 elif menu == "📷 Escanear QR Code":
   st.subheader("📷 Câmera para Leitura de QR Code")
   st.components.v1.html(
