@@ -1,12 +1,9 @@
 import base64
-import io
 import json
 import os
 import urllib.parse
-import imagehash
 import pandas as pd
 import streamlit as st
-from PIL import Image
 
 # Configuração da página
 st.set_page_config(
@@ -19,7 +16,6 @@ st.set_page_config(
 SENHA_ACESSO = "1980"
 NOME_ARQUIVO = "estoque_galpao.json"
 
-# URL OFICIAL ATUALIZADA DO APLICATIVO
 URL_APLICATIVO = "https://mapa-estoque-galpao-premium-vbewrgwbe5ktw8ptefwxmf.streamlit.app"
 
 NOME_DEV = "Vagner Souza"
@@ -73,7 +69,6 @@ def salvar_dados(estoque):
 
 
 def converter_imagem_base64(uploaded_file):
-  """Converte a imagem carregada para string Base64 para persistir no JSON."""
   if uploaded_file is not None:
     bytes_data = uploaded_file.getvalue()
     return base64.b64encode(bytes_data).decode("utf-8")
@@ -86,6 +81,10 @@ if "estoque" not in st.session_state:
 
 if "autenticado" not in st.session_state:
   st.session_state.autenticado = False
+
+# CHAVE DE REFRESH PARA LIMPAR O FORMULÁRIO APÓS SALVAR
+if "form_key" not in st.session_state:
+  st.session_state.form_key = 0
 
 # --- TELA DE LOGIN ---
 if not st.session_state.autenticado:
@@ -172,7 +171,6 @@ menu = st.sidebar.radio(
         "6. Exportar planilha (CSV)",
         "7. Gerar QR Code do Pallet",
         "8. Escanear QR Code com a Câmera",
-        "9. Buscar por foto do rótulo",
     ],
 )
 
@@ -224,12 +222,14 @@ elif menu == "2. Ver todos os vinhos":
       df = df.drop(columns=["foto"])
     st.dataframe(df, use_container_width=True)
 
-# 3. CADASTRAR VINHO (COM CAMPO DE FOTO)
+# 3. CADASTRAR VINHO (LIMPEZA AUTOMÁTICA)
 elif menu == "3. Cadastrar novo vinho":
   st.header("➕ CADASTRAR VINHO NO GALPÃO")
-  nome = st.text_input("Nome do vinho / Marca:").strip()
 
-  with st.form("form_cadastrar"):
+  # Formulário dinâmico utilizando a chave de controle
+  with st.form(f"form_cadastrar_{st.session_state.form_key}"):
+    nome = st.text_input("Nome do vinho / Marca:").strip()
+
     c_tipo, c_safra = st.columns(2)
     with c_tipo:
       tipo = st.text_input("Tipo (Tinto, Branco...):").strip()
@@ -250,11 +250,12 @@ elif menu == "3. Cadastrar novo vinho":
     st.markdown("---")
     st.subheader("📸 Foto do Vinho / Rótulo")
     foto_upload = st.file_uploader(
-        "Selecione uma imagem da galeria ou fotografe:",
-        type=["jpg", "jpeg", "png"],
+        "Selecione da galeria ou fotografe:", type=["jpg", "jpeg", "png"]
     )
 
-    if st.form_submit_button("✅ Salvar no Galpão"):
+    btn_salvar = st.form_submit_button("✅ Salvar no Galpão")
+
+    if btn_salvar:
       pallet_final = f"{sel_corredor} - {sel_pallet}"
       if nome and tipo:
         foto_b64 = converter_imagem_base64(foto_upload)
@@ -271,6 +272,10 @@ elif menu == "3. Cadastrar novo vinho":
         }
         st.session_state.estoque.append(novo_vinho)
         salvar_dados(st.session_state.estoque)
+
+        # Incrementa a chave do formulário para forçar a limpeza dos campos
+        st.session_state.form_key += 1
+
         st.success(f"✅ '{nome}' cadastrado com sucesso!")
         st.rerun()
       else:
@@ -369,20 +374,18 @@ elif menu == "7. Gerar QR Code do Pallet":
     st.warning(f"⚠️ Nenhum vinho cadastrado em {pallet_alvo} ainda.")
 
   st.markdown("---")
-  link_pallet_especifico = (
-      f"{URL_APLICATIVO}/?pallet={urllib.parse.quote(pallet_alvo)}"
-  )
+  pallet_encoded = urllib.parse.quote_plus(pallet_alvo)
+  link_pallet_especifico = f"{URL_APLICATIVO}/?pallet={pallet_encoded}"
   url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(link_pallet_especifico)}"
 
   st.image(url_qr, caption=f"Etiqueta Oficial {pallet_alvo}", width=250)
   st.caption(f"🔗 Link direto de acesso: {link_pallet_especifico}")
 
-# 8. ESCANEAR QR CODE COM A CÂMERA (CÂMERA TRASEIRA FORÇADA)
+# 8. ESCANEAR QR CODE
 elif menu == "8. Escanear QR Code com a Câmera":
   st.header("📷 Leitor de QR Code via Câmera")
   st.write("Aponte a câmera do seu celular para ler a etiqueta do pallet:")
 
-  # Script em JS forçando a ativação da câmera traseira (environment)
   st.components.v1.html(
       """
         <div id="reader" style="width:100%; max-width:400px; margin:auto;"></div>
@@ -397,9 +400,7 @@ elif menu == "8. Escanear QR Code com a Câmera":
                 { 
                     fps: 10, 
                     qrbox: 250,
-                    videoConstraints: {
-                        facingMode: { ideal: "environment" }
-                    }
+                    videoConstraints: { facingMode: { ideal: "environment" } }
                 }
             );
             html5QrcodeScanner.render(onScanSuccess);
@@ -407,82 +408,3 @@ elif menu == "8. Escanear QR Code com a Câmera":
         """,
       height=460,
   )
-
-# 9. BUSCAR VINHO POR FOTO DO RÓTULO (NOVA FUNCIONALIDADE)
-elif menu == "9. Buscar por foto do rótulo":
-  st.header("📸 BUSCAR VINHO POR FOTO DO RÓTULO")
-  st.write(
-      "Tire uma foto do rótulo ou selecione da galeria para pesquisar no"
-      " estoque:"
-  )
-
-  foto_busca = st.file_uploader(
-      "Envie ou tire a foto da garrafa:", type=["jpg", "jpeg", "png"]
-  )
-
-  if foto_busca is not None:
-    try:
-      img_busca = Image.open(foto_busca)
-      st.image(img_busca, caption="Foto para pesquisa", width=180)
-
-      # Gera o hash visual da foto informada
-      hash_busca = imagehash.average_hash(img_busca)
-
-      vinhos_encontrados = []
-
-      # Compara com todas as fotos cadastradas no estoque
-      for item in st.session_state.estoque:
-        if item.get("foto"):
-          try:
-            img_bytes = base64.b64decode(item["foto"])
-            img_banco = Image.open(io.BytesIO(img_bytes))
-
-            hash_banco = imagehash.average_hash(img_banco)
-
-            # Diferença de bits entre as imagens (quanto menor, mais idênticas)
-            diferenca = hash_busca - hash_banco
-
-            # Limite tolerável para considerar 'parecido'
-            if diferenca <= 16:
-              vinhos_encontrados.append((diferenca, item))
-          except Exception:
-            pass
-
-      # Ordena pelos rótulos com maior semelhança
-      vinhos_encontrados.sort(key=lambda x: x[0])
-
-      st.markdown("---")
-      if vinhos_encontrados:
-        st.success(
-            f"🎯 Encontrado(s) {len(vinhos_encontrados)} vinho(s)"
-            " correspondente(s):"
-        )
-        for diff, v in vinhos_encontrados:
-          col_txt, col_img = st.columns([3, 1])
-          with col_txt:
-            st.markdown(f"### 🍷 **{v.get('nome')}**")
-            st.write(
-                f"📍 **Localização:** `{v.get('pallet')}` | Lado:"
-                f" {v.get('lado')}"
-            )
-            st.write(
-                f"📦 **Embalagem:** {v.get('caixa')} | **Volume:**"
-                f" {v.get('volume')}"
-            )
-            similaridade = max(0, 100 - (diff * 5))
-            st.caption(f"Semelhança visual do rótulo: ~{similaridade}%")
-          with col_img:
-            if v.get("foto"):
-              st.image(
-                  base64.b64decode(v.get("foto")),
-                  caption="Foto do Estoque",
-                  width=100,
-              )
-          st.markdown("---")
-      else:
-        st.warning(
-            "⚠️ Nenhum vinho com rótulo semelhante foi localizado. Verifique"
-            " se o vinho possui foto cadastrada na opção 3."
-        )
-    except Exception as e:
-      st.error(f"Erro ao processar imagem: {e}")
