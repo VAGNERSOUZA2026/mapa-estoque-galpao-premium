@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 
-# Tentativa segura de importar OpenCV sem quebrar a aplicação caso não esteja no requirements.txt
+# Importações seguras para processamento de imagem e decodificação de QR Code
 try:
   import cv2
   import numpy as np
@@ -16,7 +16,14 @@ try:
 except ImportError:
   OPENCV_DISPONIVEL = False
 
-# 1. Configuração da página
+try:
+  from pyzbar.pyzbar import decode as pyzbar_decode
+
+  PYZBAR_DISPONIVEL = True
+except ImportError:
+  PYZBAR_DISPONIVEL = False
+
+# 1. Configuração da página Streamlit
 st.set_page_config(
     page_title="Mapa Estoque - Galpão Premium",
     page_icon="🍷",
@@ -24,7 +31,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# 2. CSS Personalizado
+# 2. Estilização CSS Personalizada
 st.markdown(
     """
     <style>
@@ -94,7 +101,7 @@ URL_APLICATIVO = (
     "https://mapa-estoque-galpao-premium-vbewrgwbe5ktw8ptefwxmf.streamlit.app"
 )
 
-# DADOS DO DESENVOLVEDOR / CIENTISTA DA COMPUTAÇÃO
+# DADOS DO DESENVOLVEDOR
 NOME_DEV = "Vagner Souza"
 TITULO_DEV = "Cientista da Computação"
 FONE_DEV = "(31) 98968-4010"
@@ -164,13 +171,72 @@ def comparar_hashes(h1, h2):
   return sum(c1 != c2 for c1, c2 in zip(h1, h2))
 
 
+def decodificar_qr_code(imagem_bytes):
+  """Função robusta de varredura multi-camadas para leitura de QR Code.
+
+  Aplica pré-processamentos em sequência (PyZbar -> OpenCV -> Contraste CLAHE ->
+  Limiar Otsu) para superar reflexos de tela e sombras.
+  """
+  img_pil = Image.open(io.BytesIO(imagem_bytes))
+
+  # 1. Tentativa via PyZbar
+  if PYZBAR_DISPONIVEL:
+    try:
+      resultados = pyzbar_decode(img_pil)
+      if resultados:
+        return resultados[0].data.decode("utf-8")
+    except Exception:
+      pass
+
+  # 2. Tentativa via OpenCV com Filtros de Tratamento
+  if OPENCV_DISPONIVEL:
+    try:
+      file_bytes = np.asarray(bytearray(imagem_bytes), dtype=np.uint8)
+      img_cv = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+      detector = cv2.QRCodeDetector()
+
+      # Passagem 2a: Imagem Normal
+      data, bbox, _ = detector.detectAndDecode(img_cv)
+      if data:
+        return data
+
+      # Passagem 2b: Escala de Cinza + Equalização Adaptativa de Histograma (CLAHE)
+      gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+      clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+      gray_enhanced = clahe.apply(gray)
+      data, bbox, _ = detector.detectAndDecode(gray_enhanced)
+      if data:
+        return data
+
+      # Passagem 2c: Binarização (Preto & Branco puro)
+      _, thresh = cv2.threshold(
+          gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+      )
+      data, bbox, _ = detector.detectAndDecode(thresh)
+      if data:
+        return data
+
+      # Passagem 2d: Binarização Inversa (para fotos com forte reflexo)
+      _, thresh_inv = cv2.threshold(
+          gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+      )
+      data, bbox, _ = detector.detectAndDecode(thresh_inv)
+      if data:
+        return data
+
+    except Exception:
+      pass
+
+  return None
+
+
+# --- ESTADO DE SESSÃO ---
 if "estoque" not in st.session_state:
   st.session_state.estoque = carregar_dados()
 
 if "form_key" not in st.session_state:
   st.session_state.form_key = 0
 
-# --- GERENCIAMENTO DE SESSÃO E PARÂMETROS DE QR CODE ---
 query_params = st.query_params
 auth_param = query_params.get("auth")
 pallet_param = query_params.get("pallet")
@@ -209,7 +275,7 @@ if not st.session_state.autenticado:
         st.error("Senha incorreta!")
   st.stop()
 
-# --- EXIBIÇÃO DE RESULTADO DE PALLET DE QR CODE ---
+# --- CONSULTA DIRETA VIA LINK DE QR CODE ---
 if pallet_param:
   pallet_nome = urllib.parse.unquote_plus(pallet_param)
   st.markdown(
@@ -430,7 +496,7 @@ if menu == "🔍 Buscar vinho":
       except Exception as e:
         st.error(f"Erro ao processar foto: {e}")
 
-# 2. VER TODOS OS VINHOS
+# 2. VER ESTOQUE COMPLETO
 elif menu == "🍷 Ver estoque completo":
   st.subheader("📋 Tabela do Estoque Completo")
   if st.session_state.estoque:
@@ -560,10 +626,8 @@ elif menu == "📥 Importar planilha (CSV/Excel)":
   arquivo_planilha = st.file_uploader(
       "Escolha o arquivo CSV ou Excel:", type=["csv", "xlsx"]
   )
-
   substituir = st.checkbox(
-      "⚠️ Apagar o estoque atual e substituir por este arquivo (caso desmarcado,"
-      " adicionará ao estoque existente)."
+      "⚠️ Apagar o estoque atual e substituir por este arquivo."
   )
 
   if arquivo_planilha is not None:
@@ -656,15 +720,13 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
   )
   url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(link_pallet)}"
 
-  st.image(
-      url_qr, caption=f"Etiqueta QR Code — {pallet_alvo}", width=200
-  )
+  st.image(url_qr, caption=f"Etiqueta QR Code — {pallet_alvo}", width=200)
 
-# 9. ESCANEAR QR CODE (100% SEGURO)
+# 9. ESCANEAR QR CODE (MULTI-PASS ROBUSTO)
 elif menu == "📷 Escanear QR Code":
   st.subheader("📷 Escanear QR Code do Pallet")
 
-  # Seleção manual / busca por código
+  # Opção 1: Seleção direta manual
   pallet_manual = st.selectbox(
       "Selecione o Pallet diretamente para consultar:",
       [
@@ -683,31 +745,27 @@ elif menu == "📷 Escanear QR Code":
     )
 
   st.markdown("---")
-  st.write("Ou tire uma foto do QR Code:")
+  st.write("Ou tire uma foto / envie a imagem do QR Code:")
   foto_camera = st.camera_input("Tirar foto do QR Code")
 
   if foto_camera is not None:
-    if OPENCV_DISPONIVEL:
-      try:
-        bytes_data = foto_camera.getvalue()
-        file_bytes = np.asarray(bytearray(bytes_data), dtype=np.uint8)
-        img_cv = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    bytes_imagem = foto_camera.getvalue()
 
-        detector = cv2.QRCodeDetector()
-        data, bbox, _ = detector.detectAndDecode(img_cv)
+    with st.spinner("🔍 Analisando imagem e aplicando filtros de contraste..."):
+      resultado_qr = decodificar_qr_code(bytes_imagem)
 
-        if data:
-          st.success("✅ QR Code lido com sucesso!")
-          st.markdown(
-              f'<meta http-equiv="refresh" content="0;url={data}">',
-              unsafe_allow_html=True,
-          )
-        else:
-          st.error("⚠️ QR Code não identificado claramente na foto.")
-      except Exception as e:
-        st.error(f"Erro ao ler imagem: {e}")
+    if resultado_qr:
+      st.success("✅ QR Code lido com sucesso!")
+      st.info(f"📍 Conteúdo lido: `{resultado_qr}`")
+
+      # Redireciona automaticamente se for um link de pallet válido
+      st.markdown(
+          f'<meta http-equiv="refresh" content="1;url={resultado_qr}">',
+          unsafe_allow_html=True,
+      )
     else:
-      st.warning(
-          "⚠️ Para ativar o leitor por foto no servidor, adicione"
-          " `opencv-python-headless` no seu arquivo `requirements.txt`."
+      st.error(
+          "⚠️ Não foi possível decodificar o QR Code da imagem. Dicas:\n"
+          "- Tente aproximar um pouco mais a câmera do QR Code;\n"
+          "- Evite reflexos de luz ou sombra cobrindo os cantos do QR Code."
       )
