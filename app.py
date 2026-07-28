@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# 2. CSS Personalizado para Design Mobile Premium
+# 2. CSS Personalizado
 st.markdown(
     """
     <style>
@@ -161,9 +161,10 @@ if "estoque" not in st.session_state:
 if "form_key" not in st.session_state:
   st.session_state.form_key = 0
 
-# --- GERENCIAMENTO DE SESSÃO PERSISTENTE ---
+# --- GERENCIAMENTO DE SESSÃO E PARAMETROS DE QR CODE ---
 query_params = st.query_params
 auth_param = query_params.get("auth")
+pallet_param = query_params.get("pallet")
 
 if auth_param == SENHA_ACESSO:
   st.session_state.autenticado = True
@@ -199,6 +200,53 @@ if not st.session_state.autenticado:
         st.error("Senha incorreta!")
   st.stop()
 
+# --- SE O USUÁRIO ABRIU UM LINK DE QR CODE DE PALLET ---
+if pallet_param:
+  pallet_nome = urllib.parse.unquote_plus(pallet_param)
+  st.markdown(
+      f"""
+    <div class="header-container">
+        <h1 class="main-title">📍 RESULTADO DO QR CODE</h1>
+        <p class="sub-title">Pallet Consultado: <b>{pallet_nome}</b></p>
+    </div>
+    """,
+      unsafe_allow_html=True,
+  )
+
+  vinhos_no_pallet = [
+      v for v in st.session_state.estoque if v.get("pallet") == pallet_nome
+  ]
+
+  if vinhos_no_pallet:
+    st.success(
+        f"📦 Encontrado(s) {len(vinhos_no_pallet)} vinho(s) nesta posição:"
+    )
+    for v in vinhos_no_pallet:
+      c1, c2 = st.columns([3, 1])
+      with c1:
+        st.markdown(
+            f"""
+                <div class="wine-card">
+                    <div class="wine-title">🍷 {v.get('nome')} ({v.get('safra')})</div>
+                    <p><span class="badge-pallet">📍 {v.get('pallet')}</span> <span class="badge-info">Lado: {v.get('lado')}</span></p>
+                    <p style="margin-top:8px; font-size:0.9rem;"><b>Tipo:</b> {v.get('tipo')} | <b>Embalagem:</b> {v.get('caixa')}</p>
+                </div>
+                """,
+            unsafe_allow_html=True,
+        )
+      with c2:
+        if v.get("foto"):
+          st.image(base64.b64decode(v.get("foto")), caption="Rótulo", width=90)
+  else:
+    st.warning(f"⚠️ Nenhum vinho cadastrado no **{pallet_nome}** até o momento.")
+
+  if st.button("⬅️ Voltar ao Painel Principal", use_container_width=True):
+    st.query_params.clear()
+    st.query_params["auth"] = SENHA_ACESSO
+    st.rerun()
+
+  st.stop()
+
 # --- MENU LATERAL ORGANIZADO ---
 with st.sidebar:
   st.markdown(
@@ -226,7 +274,6 @@ with st.sidebar:
     st.query_params.clear()
     st.rerun()
 
-  # CARD DE DESTAQUE DO CIENTISTA DA COMPUTAÇÃO
   st.markdown(
       f"""
         <div style="
@@ -604,68 +651,45 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
       url_qr, caption=f"Etiqueta QR Code — {pallet_alvo}", width=200
   )
 
-# 9. ESCANEAR QR CODE (SELEÇÃO INTELIGENTE DE CÂMERA TRASEIRA)
+# 9. ESCANEAR QR CODE (COM SUPORTE A FOTO DE ARQUIVO E CÂMERA INTEGRADA)
 elif menu == "📷 Escanear QR Code":
-  st.subheader("📷 Câmera para Leitura de QR Code")
-  
-  st.components.v1.html(
-      """
-        <div id="qr-reader" style="width:100%; max-width:380px; margin:auto; border-radius:12px; overflow:hidden;"></div>
-        <div id="qr-status" style="text-align:center; margin-top:10px; font-family:sans-serif; font-size:14px; color:#581825; font-weight:bold;">Iniciando câmera traseira...</div>
+  st.subheader("📷 Escanear QR Code do Pallet")
 
-        <script src="https://unpkg.com/html5-qrcode"></script>
-        <script>
-            const html5QrCode = new Html5Qrcode("qr-reader");
-            
-            function onScanSuccess(decodedText, decodedResult) {
-                html5QrCode.stop().then(() => {
-                    window.top.location.href = decodedText;
-                }).catch(err => {
-                    window.top.location.href = decodedText;
-                });
-            }
-
-            // Varre os dispositivos para achar a câmera traseira de primeira
-            Html5Qrcode.getCameras().then(devices => {
-                if (devices && devices.length) {
-                    let backCamera = devices.find(device => {
-                        let label = device.label.toLowerCase();
-                        return label.includes("back") || label.includes("traseira") || label.includes("environment") || label.includes("rear");
-                    });
-
-                    // Se encontrou a câmera nomeada como traseira usa ela; caso contrário pega a última da lista (padrão Android)
-                    let cameraId = backCamera ? backCamera.id : devices[devices.length - 1].id;
-
-                    html5QrCode.start(
-                        cameraId, 
-                        {
-                            fps: 10,
-                            qrbox: { width: 220, height: 220 }
-                        },
-                        onScanSuccess
-                    ).catch(err => {
-                        // Fallback com parâmetro padrão se a ID direta for recusada
-                        html5QrCode.start(
-                            { facingMode: "environment" },
-                            { fps: 10, qrbox: { width: 220, height: 220 } },
-                            onScanSuccess
-                        );
-                    });
-                    
-                    document.getElementById("qr-status").innerText = "Aponte a câmera para o QR Code";
-                } else {
-                    document.getElementById("qr-status").innerText = "Nenhuma câmera detectada.";
-                }
-            }).catch(err => {
-                html5QrCode.start(
-                    { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 220, height: 220 } },
-                    onScanSuccess
-                ).catch(e => {
-                    document.getElementById("qr-status").innerText = "Erro ao acessar a câmera. Verifique as permissões do navegador.";
-                });
-            });
-        </script>
-        """,
-      height=480,
+  aba_cam, aba_upload = st.tabs(
+      ["📹 Câmera ao Vivo", "🖼️ Enviar Foto do QR Code"]
   )
+
+  with aba_cam:
+    st.components.v1.html(
+        """
+            <div id="reader" style="width:100%; max-width:380px; margin:auto;"></div>
+            <script src="https://unpkg.com/html5-qrcode"></script>
+            <script>
+                function onScanSuccess(decodedText) { 
+                    window.top.location.href = decodedText; 
+                }
+                let html5QrcodeScanner = new Html5QrcodeScanner(
+                    "reader", 
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    /* verbose= */ false
+                );
+                html5QrcodeScanner.render(onScanSuccess);
+            </script>
+            """,
+        height=450,
+    )
+
+  with aba_upload:
+    st.write(
+        "Se a câmera do seu navegador bloquear, tire uma foto do QR Code e"
+        " suba abaixo:"
+    )
+    img_qr = st.file_uploader(
+        "Selecione a foto do QR Code:", type=["png", "jpg", "jpeg"]
+    )
+    if img_qr is not None:
+      st.warning(
+          "⚠️ Para abrir o link direto da imagem subida, abra o leitor de QR"
+          " Code padrão do seu próprio celular ou aponte a câmera comum do"
+          " telefone."
+      )
