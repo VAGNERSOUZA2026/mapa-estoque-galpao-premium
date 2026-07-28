@@ -561,7 +561,7 @@ elif menu == "📤 Exportar planilha (CSV)":
     csv = df_exp.to_csv(index=False, sep=";").encode("utf-8-sig")
     st.download_button("📥 Download CSV", csv, "estoque_galpao.csv", "text/csv")
 
-# 8. GERAR QR CODE DO PALLET (COM PRÉVIA DOS VINHOS)
+# 8. GERAR QR CODE DO PALLET
 elif menu == "🏷️ Gerar QR Code do Pallet":
   st.subheader("🏷️ Etiquetas para Pallet")
 
@@ -573,14 +573,12 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
 
   pallet_alvo = f"{qr_corr} - {qr_pal}"
 
-  # Busca vinhos salvos neste pallet especificamente
   vinhos_no_pallet = [
       v for v in st.session_state.estoque if v.get("pallet") == pallet_alvo
   ]
 
   st.markdown("---")
 
-  # Exibe os vinhos do pallet selecionado
   if vinhos_no_pallet:
     st.success(
         f"📦 **{len(vinhos_no_pallet)} vinho(s)** encontrado(s) em"
@@ -596,7 +594,6 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
 
   st.markdown("---")
 
-  # Gerador do QR Code
   pallet_encoded = urllib.parse.quote_plus(pallet_alvo)
   link_pallet = (
       f"{URL_APLICATIVO}/?pallet={pallet_encoded}&auth={SENHA_ACESSO}"
@@ -607,9 +604,11 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
       url_qr, caption=f"Etiqueta QR Code — {pallet_alvo}", width=200
   )
 
-# 9. ESCANEAR QR CODE (CÂMERA TRASEIRA FORÇADA)
+# 9. ESCANEAR QR CODE (COM SELEÇÃO FLEXÍVEL DE CÂMERA)
 elif menu == "📷 Escanear QR Code":
   st.subheader("📷 Câmera para Leitura de QR Code")
+  st.info("💡 **Dica:** Permita o acesso à câmera no seu navegador quando solicitado.")
+  
   st.components.v1.html(
       """
         <div id="reader" style="width:100%; max-width:380px; margin:auto;"></div>
@@ -619,22 +618,20 @@ elif menu == "📷 Escanear QR Code":
                 window.top.location.href = decodedText; 
             }
             
+            // Inicialização robusta que permite escolher a câmera caso haja restrição
             let html5QrcodeScanner = new Html5QrcodeScanner(
                 "reader", 
                 { 
                     fps: 10, 
-                    qrbox: 220,
-                    videoConstraints: {
-                        facingMode: { exact: "environment" }
-                    }
-                }
+                    qrbox: { width: 220, height: 220 },
+                    rememberLastUsedCamera: true,
+                    showTorchButtonIfSupported: true
+                },
+                /* verbose= */ false
             );
             
-            html5QrcodeScanner.render(onScanSuccess).catch(err => {
-                let fallbackScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 220 });
-                fallbackScanner.render(onScanSuccess);
-            });
+            html5QrcodeScanner.render(onScanSuccess);
         </script>
         """,
-      height=450,
+      height=500,
   )
