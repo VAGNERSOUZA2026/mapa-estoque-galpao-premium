@@ -15,39 +15,37 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 2. CSS Personalizado para a Interface Moderna
+# 2. CSS Personalizado - Visual Elegante & Limpo
 st.markdown(
     """
     <style>
-    /* Estilo do título principal */
     .main-header {
         font-size: 2.2rem;
         font-weight: 700;
-        color: #722F37;
+        color: #581825;
         margin-bottom: 0.2rem;
     }
     .sub-header {
         font-size: 1rem;
-        color: #555555;
+        color: #666666;
         margin-bottom: 1.5rem;
     }
-    /* Card de exibição do vinho */
     .wine-card {
         background-color: #ffffff;
-        border: 1px solid #e0e0e0;
+        border: 1px solid #e2e8f0;
         border-radius: 12px;
         padding: 18px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04);
         margin-bottom: 15px;
     }
     .wine-title {
-        color: #722F37;
+        color: #581825;
         font-size: 1.3rem;
         font-weight: bold;
         margin-bottom: 8px;
     }
     .badge-pallet {
-        background-color: #722F37;
+        background-color: #581825;
         color: white;
         padding: 4px 10px;
         border-radius: 6px;
@@ -55,8 +53,8 @@ st.markdown(
         font-size: 0.85rem;
     }
     .badge-info {
-        background-color: #f0f2f6;
-        color: #333;
+        background-color: #f1f5f9;
+        color: #334155;
         padding: 4px 8px;
         border-radius: 6px;
         font-size: 0.85rem;
@@ -74,9 +72,6 @@ URL_APLICATIVO = "https://mapa-estoque-galpao-premium-vbewrgwbe5ktw8ptefwxmf.str
 
 NOME_DEV = "Vagner Souza"
 FONE_DEV = "(31) 98968-4010"
-
-# LINK DO ÍCONE PNG (Você pode trocar pelo link direto da sua imagem/logo em PNG)
-URL_LOGO_PNG = "https://cdn-icons-png.flaticon.com/512/2907/2907311.png"
 
 LISTA_CORREDORES = [f"Corredor {i:02d}" for i in range(1, 26)]
 LISTA_PALLETS = [f"Pallet {i:02d}" for i in range(1, 26)]
@@ -143,7 +138,7 @@ def comparar_hashes(h1, h2):
   return sum(c1 != c2 for c1, c2 in zip(h1, h2))
 
 
-# Inicialização das Sessões
+# Inicializações de Estado
 if "estoque" not in st.session_state:
   st.session_state.estoque = carregar_dados()
 
@@ -157,14 +152,13 @@ if "form_key" not in st.session_state:
 if not st.session_state.autenticado:
   c1, c2, c3 = st.columns([1, 2, 1])
   with c2:
-    st.image(URL_LOGO_PNG, width=110)
     st.markdown(
-        "<h1 style='text-align: center; color: #722F37;'>GALPÃO PREMIUM</h1>",
+        "<h1 style='text-align: center; color: #581825;'>🍷 GALPÃO PREMIUM</h1>",
         unsafe_allow_html=True,
     )
     st.markdown(
-        "<p style='text-align: center;'>Sistema de Controle e Localização de"
-        " Estoque</p>",
+        "<p style='text-align: center; color: #666;'>Sistema de Localização e"
+        " Gestão de Estoque</p>",
         unsafe_allow_html=True,
     )
 
@@ -183,18 +177,13 @@ if not st.session_state.autenticado:
           st.error("Senha incorreta!")
   st.stop()
 
-# --- BARRA LATERAL (SIDEBAR) ---
+# --- BARRA LATERAL (SIDEBAR LIMPA E ELEGANTE) ---
 with st.sidebar:
-  # ÍCONE PNG NO TOPO DO MENU
-  col_logo1, col_logo2 = st.columns([1, 3])
-  with col_logo1:
-    st.image(URL_LOGO_PNG, width=55)
-  with col_logo2:
-    st.markdown(
-        "<h3 style='margin:0; color:#722F37;'>Galpão</h3><p"
-        " style='margin:0;font-size:0.8rem;'>Gestão de Estoque</p>",
-        unsafe_allow_html=True,
-    )
+  st.markdown(
+      "<h2 style='color:#581825; margin-bottom:0;'>🍷 Galpão</h2>",
+      unsafe_allow_html=True,
+  )
+  st.caption("Gestão de Estoque")
 
   st.markdown("---")
 
@@ -215,23 +204,13 @@ with st.sidebar:
 
   st.markdown("---")
 
-  # MÉTRIAS RÁPIDAS
-  total_vinhos = len(st.session_state.estoque)
-  pallets_unicos = len(
-      set([v.get("pallet") for v in st.session_state.estoque if v.get("pallet")])
-  )
-
-  st.metric("Total de Cadastros", f"{total_vinhos} vinhos")
-  st.metric("Pallets Ocupados", f"{pallets_unicos} pallets")
-
-  st.markdown("---")
   if st.button("🔒 Sair do Sistema", use_container_width=True):
     st.session_state.autenticado = False
     st.rerun()
 
   st.caption(f"👨‍💻 Dev: **{NOME_DEV}**\n\n📞 {FONE_DEV}")
 
-# --- 🎯 TELA DE LEITURA DO QR CODE ---
+# --- 🎯 LEITURA DE QR CODE ---
 query_params = st.query_params
 pallet_qr = query_params.get("pallet") or query_params.get("p")
 
@@ -336,7 +315,7 @@ elif menu == "🍷 Ver estoque completo":
       df = df.drop(columns=["foto"])
     st.dataframe(df, use_container_width=True)
 
-# 3. CADASTRAR VINHO (COM LIMPEZA DE FORMULÁRIO)
+# 3. CADASTRAR VINHO (LIMPA APÓS SALVAR)
 elif menu == "➕ Cadastrar novo vinho":
   st.subheader("➕ Novo Cadastro")
 
@@ -389,7 +368,7 @@ elif menu == "➕ Cadastrar novo vinho":
         st.session_state.estoque.append(novo_vinho)
         salvar_dados(st.session_state.estoque)
 
-        # Limpa o formulário forçando nova chave
+        # Limpa o formulário automaticamente
         st.session_state.form_key += 1
         st.success(f"✅ '{nome}' cadastrado com sucesso!")
         st.rerun()
@@ -543,4 +522,4 @@ elif menu == "📸 Buscar por foto do rótulo":
       else:
         st.warning("Nenhum rótulo parecido no cadastro.")
     except Exception as e:
-        st.error(f"Erro ao processar imagem: {e}")
+      st.error(f"Erro ao processar imagem: {e}")
