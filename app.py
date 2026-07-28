@@ -3,11 +3,18 @@ import io
 import json
 import os
 import urllib.parse
-import cv2
-import numpy as np
 import pandas as pd
 import streamlit as st
 from PIL import Image
+
+# Tentativa segura de importar OpenCV sem quebrar a aplicação caso não esteja no requirements.txt
+try:
+  import cv2
+  import numpy as np
+
+  OPENCV_DISPONIVEL = True
+except ImportError:
+  OPENCV_DISPONIVEL = False
 
 # 1. Configuração da página
 st.set_page_config(
@@ -653,34 +660,54 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
       url_qr, caption=f"Etiqueta QR Code — {pallet_alvo}", width=200
   )
 
-# 9. ESCANEAR QR CODE (USANDO DETECTOR NATIVO DO OPENCV)
+# 9. ESCANEAR QR CODE (100% SEGURO)
 elif menu == "📷 Escanear QR Code":
   st.subheader("📷 Escanear QR Code do Pallet")
-  st.info("Aponte para a etiqueta do Pallet:")
 
+  # Seleção manual / busca por código
+  pallet_manual = st.selectbox(
+      "Selecione o Pallet diretamente para consultar:",
+      [
+          f"{corredor} - {pallet}"
+          for corredor in LISTA_CORREDORES
+          for pallet in LISTA_PALLETS
+      ],
+  )
+
+  if st.button("📍 Ver Vinhos deste Pallet", use_container_width=True):
+    pallet_encoded = urllib.parse.quote_plus(pallet_manual)
+    st.markdown(
+        f'<meta http-equiv="refresh"'
+        f' content="0;url={URL_APLICATIVO}/?pallet={pallet_encoded}&auth={SENHA_ACESSO}">',
+        unsafe_allow_html=True,
+    )
+
+  st.markdown("---")
+  st.write("Ou tire uma foto do QR Code:")
   foto_camera = st.camera_input("Tirar foto do QR Code")
 
   if foto_camera is not None:
-    try:
-      # Converte a imagem tirada para formato OpenCV (BGR)
-      bytes_data = foto_camera.getvalue()
-      file_bytes = np.asarray(bytearray(bytes_data), dtype=np.uint8)
-      img_cv = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    if OPENCV_DISPONIVEL:
+      try:
+        bytes_data = foto_camera.getvalue()
+        file_bytes = np.asarray(bytearray(bytes_data), dtype=np.uint8)
+        img_cv = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
-      # Detector de QR Code do OpenCV
-      detector = cv2.QRCodeDetector()
-      data, bbox, _ = detector.detectAndDecode(img_cv)
+        detector = cv2.QRCodeDetector()
+        data, bbox, _ = detector.detectAndDecode(img_cv)
 
-      if data:
-        st.success("✅ QR Code lido com sucesso!")
-        st.markdown(
-            f'<meta http-equiv="refresh" content="0;url={data}">',
-            unsafe_allow_html=True,
-        )
-      else:
-        st.error(
-            "⚠️ Não foi possível ler o QR Code da imagem. Certifique-se de que"
-            " a foto está focada e clara."
-        )
-    except Exception as e:
-      st.error(f"Erro ao ler imagem: {e}")
+        if data:
+          st.success("✅ QR Code lido com sucesso!")
+          st.markdown(
+              f'<meta http-equiv="refresh" content="0;url={data}">',
+              unsafe_allow_html=True,
+          )
+        else:
+          st.error("⚠️ QR Code não identificado claramente na foto.")
+      except Exception as e:
+        st.error(f"Erro ao ler imagem: {e}")
+    else:
+      st.warning(
+          "⚠️ Para ativar o leitor por foto no servidor, adicione"
+          " `opencv-python-headless` no seu arquivo `requirements.txt`."
+      )
