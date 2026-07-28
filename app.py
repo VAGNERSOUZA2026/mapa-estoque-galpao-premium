@@ -19,15 +19,12 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Prevent inadvertent text/page pulls */
     html, body {
         overscroll-behavior-y: contain;
     }
-    
     .stApp {
         background-color: #FAFAFA;
     }
-    
     .header-container {
         text-align: center;
         padding: 10px 0 15px 0;
@@ -44,7 +41,6 @@ st.markdown(
         color: #777777;
         margin-bottom: 10px;
     }
-
     .wine-card {
         background-color: #FFFFFF;
         border-radius: 16px;
@@ -89,7 +85,9 @@ URL_APLICATIVO = (
     "https://mapa-estoque-galpao-premium-vbewrgwbe5ktw8ptefwxmf.streamlit.app"
 )
 
+# DADOS DO DESENVOLVEDOR / CIENTISTA DA COMPUTAÇÃO
 NOME_DEV = "Vagner Souza"
+TITULO_DEV = "Cientista da Computação"
 FONE_DEV = "(31) 98968-4010"
 
 LISTA_CORREDORES = [f"Corredor {i:02d}" for i in range(1, 26)]
@@ -157,7 +155,6 @@ def comparar_hashes(h1, h2):
   return sum(c1 != c2 for c1, c2 in zip(h1, h2))
 
 
-# Inicialização do Estoque
 if "estoque" not in st.session_state:
   st.session_state.estoque = carregar_dados()
 
@@ -168,7 +165,6 @@ if "form_key" not in st.session_state:
 query_params = st.query_params
 auth_param = query_params.get("auth")
 
-# Verifica se a sessão está salva nos parâmetros da URL ou no session_state
 if auth_param == SENHA_ACESSO:
   st.session_state.autenticado = True
 
@@ -196,14 +192,14 @@ if not st.session_state.autenticado:
     if btn_login:
       if senha_digitada == SENHA_ACESSO:
         st.session_state.autenticado = True
-        st.query_params["auth"] = SENHA_ACESSO  # Salva a autenticação na URL
+        st.query_params["auth"] = SENHA_ACESSO
         st.success("Acesso Autorizado!")
         st.rerun()
       else:
         st.error("Senha incorreta!")
   st.stop()
 
-# --- MENU LATERAL ---
+# --- MENU LATERAL DESTAQUE DEV ---
 with st.sidebar:
   st.markdown(
       "<h2 style='color:#581825;'>🍷 Galpão Premium</h2>", unsafe_allow_html=True
@@ -225,10 +221,39 @@ with st.sidebar:
 
   if st.button("🔒 Sair do Sistema", use_container_width=True):
     st.session_state.autenticado = False
-    st.query_params.clear()  # Limpa os parâmetros de autenticação
+    st.query_params.clear()
     st.rerun()
 
-  st.caption(f"👨‍💻 Dev: **{NOME_DEV}**\n\n📞 {FONE_DEV}")
+  # CARD DE DESTAQUE DO CIENTISTA DA COMPUTAÇÃO
+  st.markdown(
+      f"""
+        <div style="
+            background: linear-gradient(135deg, #581825 0%, #2D0C13 100%);
+            padding: 14px;
+            border-radius: 12px;
+            color: white;
+            text-align: center;
+            margin-top: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+        ">
+            <p style="margin: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: #D1A3AB;">
+                Desenvolvimento & Arq.
+            </p>
+            <h4 style="margin: 4px 0 2px 0; color: #FFFFFF; font-size: 1.05rem; font-weight: 700;">
+                {NOME_DEV}
+            </h4>
+            <p style="margin: 0 0 8px 0; font-size: 0.78rem; color: #E2E8F0; font-weight: 500;">
+                🎓 {TITULO_DEV}
+            </p>
+            <div style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 6px; margin-top: 6px;">
+                <p style="margin: 0; font-size: 0.78rem; color: #FFD700; font-weight: bold;">
+                    📞 {FONE_DEV}
+                </p>
+            </div>
+        </div>
+    """,
+      unsafe_allow_html=True,
+  )
 
 # --- CABEÇALHO DA PÁGINA PRINCIPAL ---
 st.markdown(
