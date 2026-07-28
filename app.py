@@ -199,20 +199,21 @@ if not st.session_state.autenticado:
         st.error("Senha incorreta!")
   st.stop()
 
-# --- MENU LATERAL DESTAQUE DEV ---
+# --- MENU LATERAL ORGANIZADO ---
 with st.sidebar:
   st.markdown(
       "<h2 style='color:#581825;'>🍷 Galpão Premium</h2>", unsafe_allow_html=True
   )
+
   menu = st.radio(
-      "Menu:",
+      "Menu Principais:",
       [
           "🔍 Buscar vinho",
           "🍷 Ver estoque completo",
           "➕ Cadastrar novo vinho",
-          "📥 Importar planilha (CSV/Excel)",
           "✏️ Editar vinho",
           "🗑️ Excluir vinho",
+          "📥 Importar planilha (CSV/Excel)",
           "📤 Exportar planilha (CSV)",
           "🏷️ Gerar QR Code do Pallet",
           "📷 Escanear QR Code",
@@ -441,67 +442,7 @@ elif menu == "➕ Cadastrar novo vinho":
       else:
         st.error("⚠️ Preencha pelo menos o Nome e o Tipo.")
 
-# 4. IMPORTAR PLANILHA (NOVO RECURSO)
-elif menu == "📥 Importar planilha (CSV/Excel)":
-  st.subheader("📥 Carga em Lote por Planilha")
-  st.info(
-      "Suba um arquivo **.csv** ou **.xlsx** contendo as colunas: `nome`,"
-      " `tipo`, `safra`, `pallet`, `lado`, `caixa`, `volume`."
-  )
-
-  arquivo_planilha = st.file_uploader(
-      "Escolha o arquivo CSV ou Excel:", type=["csv", "xlsx"]
-  )
-
-  substituir = st.checkbox(
-      "⚠️ Apagar o estoque atual e substituir por este arquivo (caso desmarcado,"
-      " adicionará ao estoque existente)."
-  )
-
-  if arquivo_planilha is not None:
-    try:
-      if arquivo_planilha.name.endswith(".csv"):
-        # Tenta carregar CSV com separador ; ou ,
-        try:
-          df_import = pd.read_csv(arquivo_planilha, sep=";")
-          if "nome" not in df_import.columns:
-            arquivo_planilha.seek(0)
-            df_import = pd.read_csv(arquivo_planilha, sep=",")
-        except Exception:
-          df_import = pd.read_csv(arquivo_planilha)
-      else:
-        df_import = pd.read_excel(arquivo_planilha)
-
-      st.write("👀 Previa dos dados encontrados:")
-      st.dataframe(df_import.head(10), use_container_width=True)
-
-      if st.button("🚀 Confirmar Importação de Dados", use_container_width=True):
-        novos_itens = df_import.to_dict(orient="records")
-
-        for item in novos_itens:
-          if "foto" not in item or pd.isna(item["foto"]):
-            item["foto"] = None
-          # Converte valores nulos para texto vazio
-          for k, v in item.items():
-            if pd.isna(v):
-              item[k] = ""
-
-        if substituir:
-          st.session_state.estoque = novos_itens
-        else:
-          st.session_state.estoque.extend(novos_itens)
-
-        salvar_dados(st.session_state.estoque)
-        st.success(
-            f"🎉 Sucesso! {len(novos_itens)} vinhos foram adicionados ao"
-            " sistema."
-        )
-        st.rerun()
-
-    except Exception as e:
-      st.error(f"Erro ao ler arquivo: {e}")
-
-# 5. EDITAR VINHO
+# 4. EDITAR VINHO
 elif menu == "✏️ Editar vinho":
   st.subheader("✏️ Alterar Cadastro")
   if st.session_state.estoque:
@@ -533,7 +474,7 @@ elif menu == "✏️ Editar vinho":
         st.success("Atualizado!")
         st.rerun()
 
-# 6. EXCLUIR VINHO
+# 5. EXCLUIR VINHO
 elif menu == "🗑️ Excluir vinho":
   st.subheader("🗑️ Remover do Estoque")
   if st.session_state.estoque:
@@ -552,7 +493,65 @@ elif menu == "🗑️ Excluir vinho":
       st.success("Removido!")
       st.rerun()
 
-# 7. EXPORTAR PLANILHA
+# 6. IMPORTAR PLANILHA
+elif menu == "📥 Importar planilha (CSV/Excel)":
+  st.subheader("📥 Carga em Lote por Planilha")
+  st.info(
+      "Suba um arquivo **.csv** ou **.xlsx** contendo as colunas: `nome`,"
+      " `tipo`, `safra`, `pallet`, `lado`, `caixa`, `volume`."
+  )
+
+  arquivo_planilha = st.file_uploader(
+      "Escolha o arquivo CSV ou Excel:", type=["csv", "xlsx"]
+  )
+
+  substituir = st.checkbox(
+      "⚠️ Apagar o estoque atual e substituir por este arquivo (caso desmarcado,"
+      " adicionará ao estoque existente)."
+  )
+
+  if arquivo_planilha is not None:
+    try:
+      if arquivo_planilha.name.endswith(".csv"):
+        try:
+          df_import = pd.read_csv(arquivo_planilha, sep=";")
+          if "nome" not in df_import.columns:
+            arquivo_planilha.seek(0)
+            df_import = pd.read_csv(arquivo_planilha, sep=",")
+        except Exception:
+          df_import = pd.read_csv(arquivo_planilha)
+      else:
+        df_import = pd.read_excel(arquivo_planilha)
+
+      st.write("👀 Prévia dos dados encontrados:")
+      st.dataframe(df_import.head(10), use_container_width=True)
+
+      if st.button("🚀 Confirmar Importação de Dados", use_container_width=True):
+        novos_itens = df_import.to_dict(orient="records")
+
+        for item in novos_itens:
+          if "foto" not in item or pd.isna(item["foto"]):
+            item["foto"] = None
+          for k, v in item.items():
+            if pd.isna(v):
+              item[k] = ""
+
+        if substituir:
+          st.session_state.estoque = novos_itens
+        else:
+          st.session_state.estoque.extend(novos_itens)
+
+        salvar_dados(st.session_state.estoque)
+        st.success(
+            f"🎉 Sucesso! {len(novos_itens)} vinhos foram adicionados ao"
+            " sistema."
+        )
+        st.rerun()
+
+    except Exception as e:
+      st.error(f"Erro ao ler arquivo: {e}")
+
+# 7. EXPORTAR PLANILHA (LOGO APÓS A IMPORTAÇÃO!)
 elif menu == "📤 Exportar planilha (CSV)":
   st.subheader("📤 Baixar Dados em Planilha")
   if st.session_state.estoque:
