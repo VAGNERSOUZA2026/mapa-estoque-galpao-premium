@@ -1,4 +1,6 @@
 streamlit
 pandas
-qrcode
-Pillow
+pillow
+imagehash
+PyWavelets
+scipy
