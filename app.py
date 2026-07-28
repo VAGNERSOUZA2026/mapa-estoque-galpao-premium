@@ -7,6 +7,12 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 
+# Tentativa de importação da biblioteca de leitura de QR Code no backend
+try:
+  from pyzbar.pyzbar import decode as decode_qr
+except ImportError:
+  decode_qr = None
+
 # 1. Configuração da página
 st.set_page_config(
     page_title="Mapa Estoque - Galpão Premium",
@@ -161,7 +167,7 @@ if "estoque" not in st.session_state:
 if "form_key" not in st.session_state:
   st.session_state.form_key = 0
 
-# --- GERENCIAMENTO DE SESSÃO E PARAMETROS DE QR CODE ---
+# --- GERENCIAMENTO DE SESSÃO E PARÂMETROS DE QR CODE ---
 query_params = st.query_params
 auth_param = query_params.get("auth")
 pallet_param = query_params.get("pallet")
@@ -200,14 +206,14 @@ if not st.session_state.autenticado:
         st.error("Senha incorreta!")
   st.stop()
 
-# --- SE O USUÁRIO ABRIU UM LINK DE QR CODE DE PALLET ---
+# --- EXIBIÇÃO DE RESULTADO DE PALLET DE QR CODE ---
 if pallet_param:
   pallet_nome = urllib.parse.unquote_plus(pallet_param)
   st.markdown(
       f"""
     <div class="header-container">
-        <h1 class="main-title">📍 RESULTADO DO QR CODE</h1>
-        <p class="sub-title">Pallet Consultado: <b>{pallet_nome}</b></p>
+        <h1 class="main-title">📍 RESULTADO DO PALLET</h1>
+        <p class="sub-title">Consultando: <b>{pallet_nome}</b></p>
     </div>
     """,
       unsafe_allow_html=True,
@@ -247,7 +253,7 @@ if pallet_param:
 
   st.stop()
 
-# --- MENU LATERAL ORGANIZADO ---
+# --- MENU LATERAL ---
 with st.sidebar:
   st.markdown(
       "<h2 style='color:#581825;'>🍷 Galpão Premium</h2>", unsafe_allow_html=True
@@ -304,7 +310,7 @@ with st.sidebar:
       unsafe_allow_html=True,
   )
 
-# --- CABEÇALHO DA PÁGINA PRINCIPAL ---
+# --- CABEÇALHO PRINCIPAL ---
 st.markdown(
     """
     <div class="header-container">
@@ -651,45 +657,35 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
       url_qr, caption=f"Etiqueta QR Code — {pallet_alvo}", width=200
   )
 
-# 9. ESCANEAR QR CODE (COM SUPORTE A FOTO DE ARQUIVO E CÂMERA INTEGRADA)
+# 9. ESCANEAR QR CODE (SEM ERRO DE CÂMERA FRONTAL)
 elif menu == "📷 Escanear QR Code":
   st.subheader("📷 Escanear QR Code do Pallet")
+  st.info("Aponte para a etiqueta do Pallet:")
 
-  aba_cam, aba_upload = st.tabs(
-      ["📹 Câmera ao Vivo", "🖼️ Enviar Foto do QR Code"]
-  )
+  # Câmera nativa do Streamlit (força abertura de foto rápida)
+  foto_camera = st.camera_input("Tirar foto do QR Code")
 
-  with aba_cam:
-    st.components.v1.html(
-        """
-            <div id="reader" style="width:100%; max-width:380px; margin:auto;"></div>
-            <script src="https://unpkg.com/html5-qrcode"></script>
-            <script>
-                function onScanSuccess(decodedText) { 
-                    window.top.location.href = decodedText; 
-                }
-                let html5QrcodeScanner = new Html5QrcodeScanner(
-                    "reader", 
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
-                    /* verbose= */ false
-                );
-                html5QrcodeScanner.render(onScanSuccess);
-            </script>
-            """,
-        height=450,
-    )
-
-  with aba_upload:
-    st.write(
-        "Se a câmera do seu navegador bloquear, tire uma foto do QR Code e"
-        " suba abaixo:"
-    )
-    img_qr = st.file_uploader(
-        "Selecione a foto do QR Code:", type=["png", "jpg", "jpeg"]
-    )
-    if img_qr is not None:
-      st.warning(
-          "⚠️ Para abrir o link direto da imagem subida, abra o leitor de QR"
-          " Code padrão do seu próprio celular ou aponte a câmera comum do"
-          " telefone."
-      )
+  if foto_camera is not None:
+    try:
+      img = Image.open(foto_camera)
+      if decode_qr is not None:
+        decoded_objs = decode_qr(img)
+        if decoded_objs:
+          link_qr = decoded_objs[0].data.decode("utf-8")
+          st.success("✅ QR Code lido com sucesso!")
+          st.markdown(
+              f'<meta http-equiv="refresh" content="0;url={link_qr}">',
+              unsafe_allow_html=True,
+          )
+        else:
+          st.error(
+              "⚠️ Não foi possível ler um QR Code válido na imagem. Tente"
+              " aproximar mais."
+          )
+      else:
+        st.warning(
+            "⚠️ Biblioteca 'pyzbar' não instalada no servidor para leitura"
+            " automática. Adicione 'pyzbar' ao seu requirements.txt."
+        )
+    except Exception as e:
+      st.error(f"Erro ao processar imagem: {e}")
