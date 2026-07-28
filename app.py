@@ -604,34 +604,68 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
       url_qr, caption=f"Etiqueta QR Code — {pallet_alvo}", width=200
   )
 
-# 9. ESCANEAR QR CODE (COM SELEÇÃO FLEXÍVEL DE CÂMERA)
+# 9. ESCANEAR QR CODE (SELEÇÃO INTELIGENTE DE CÂMERA TRASEIRA)
 elif menu == "📷 Escanear QR Code":
   st.subheader("📷 Câmera para Leitura de QR Code")
-  st.info("💡 **Dica:** Permita o acesso à câmera no seu navegador quando solicitado.")
   
   st.components.v1.html(
       """
-        <div id="reader" style="width:100%; max-width:380px; margin:auto;"></div>
+        <div id="qr-reader" style="width:100%; max-width:380px; margin:auto; border-radius:12px; overflow:hidden;"></div>
+        <div id="qr-status" style="text-align:center; margin-top:10px; font-family:sans-serif; font-size:14px; color:#581825; font-weight:bold;">Iniciando câmera traseira...</div>
+
         <script src="https://unpkg.com/html5-qrcode"></script>
         <script>
-            function onScanSuccess(decodedText) { 
-                window.top.location.href = decodedText; 
+            const html5QrCode = new Html5Qrcode("qr-reader");
+            
+            function onScanSuccess(decodedText, decodedResult) {
+                html5QrCode.stop().then(() => {
+                    window.top.location.href = decodedText;
+                }).catch(err => {
+                    window.top.location.href = decodedText;
+                });
             }
-            
-            // Inicialização robusta que permite escolher a câmera caso haja restrição
-            let html5QrcodeScanner = new Html5QrcodeScanner(
-                "reader", 
-                { 
-                    fps: 10, 
-                    qrbox: { width: 220, height: 220 },
-                    rememberLastUsedCamera: true,
-                    showTorchButtonIfSupported: true
-                },
-                /* verbose= */ false
-            );
-            
-            html5QrcodeScanner.render(onScanSuccess);
+
+            // Varre os dispositivos para achar a câmera traseira de primeira
+            Html5Qrcode.getCameras().then(devices => {
+                if (devices && devices.length) {
+                    let backCamera = devices.find(device => {
+                        let label = device.label.toLowerCase();
+                        return label.includes("back") || label.includes("traseira") || label.includes("environment") || label.includes("rear");
+                    });
+
+                    // Se encontrou a câmera nomeada como traseira usa ela; caso contrário pega a última da lista (padrão Android)
+                    let cameraId = backCamera ? backCamera.id : devices[devices.length - 1].id;
+
+                    html5QrCode.start(
+                        cameraId, 
+                        {
+                            fps: 10,
+                            qrbox: { width: 220, height: 220 }
+                        },
+                        onScanSuccess
+                    ).catch(err => {
+                        // Fallback com parâmetro padrão se a ID direta for recusada
+                        html5QrCode.start(
+                            { facingMode: "environment" },
+                            { fps: 10, qrbox: { width: 220, height: 220 } },
+                            onScanSuccess
+                        );
+                    });
+                    
+                    document.getElementById("qr-status").innerText = "Aponte a câmera para o QR Code";
+                } else {
+                    document.getElementById("qr-status").innerText = "Nenhuma câmera detectada.";
+                }
+            }).catch(err => {
+                html5QrCode.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: { width: 220, height: 220 } },
+                    onScanSuccess
+                ).catch(e => {
+                    document.getElementById("qr-status").innerText = "Erro ao acessar a câmera. Verifique as permissões do navegador.";
+                });
+            });
         </script>
         """,
-      height=500,
+      height=480,
   )
