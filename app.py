@@ -12,22 +12,25 @@ st.set_page_config(
     page_title="Mapa Estoque - Galpão Premium",
     page_icon="🍷",
     layout="wide",
-    initial_sidebar_state="collapsed",  # Inicia recolhido para focar na tela no celular
+    initial_sidebar_state="collapsed",
 )
 
 # 2. CSS Personalizado para Design Mobile Premium
 st.markdown(
     """
     <style>
-    /* Fundo geral mais agradável */
+    /* Prevent inadvertent text/page pulls */
+    html, body {
+        overscroll-behavior-y: contain;
+    }
+    
     .stApp {
         background-color: #FAFAFA;
     }
     
-    /* Cabeçalho do App */
     .header-container {
         text-align: center;
-        padding: 10px 0 20px 0;
+        padding: 10px 0 15px 0;
     }
     .main-title {
         font-size: 1.8rem;
@@ -39,10 +42,9 @@ st.markdown(
     .sub-title {
         font-size: 0.9rem;
         color: #777777;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
     }
 
-    /* Card de Vinho Estilizado */
     .wine-card {
         background-color: #FFFFFF;
         border-radius: 16px;
@@ -75,14 +77,6 @@ st.markdown(
         margin-left: 4px;
         display: inline-block;
     }
-    
-    /* Ajuste para inputs redondos e modernos */
-    .stTextInput > div > div > input {
-        border-radius: 10px;
-    }
-    .stSelectbox > div > div {
-        border-radius: 10px;
-    }
     </style>
 """,
     unsafe_allow_html=True,
@@ -91,7 +85,9 @@ st.markdown(
 # --- CONFIGURAÇÕES DO GALPÃO ---
 SENHA_ACESSO = "1980"
 NOME_ARQUIVO = "estoque_galpao.json"
-URL_APLICATIVO = "https://mapa-estoque-galpao-premium-vbewrgwbe5ktw8ptefwxmf.streamlit.app"
+URL_APLICATIVO = (
+    "https://mapa-estoque-galpao-premium-vbewrgwbe5ktw8ptefwxmf.streamlit.app"
+)
 
 NOME_DEV = "Vagner Souza"
 FONE_DEV = "(31) 98968-4010"
@@ -161,15 +157,23 @@ def comparar_hashes(h1, h2):
   return sum(c1 != c2 for c1, c2 in zip(h1, h2))
 
 
-# Inicialização de sessões
+# Inicialização do Estoque
 if "estoque" not in st.session_state:
   st.session_state.estoque = carregar_dados()
 
-if "autenticado" not in st.session_state:
-  st.session_state.autenticado = False
-
 if "form_key" not in st.session_state:
   st.session_state.form_key = 0
+
+# --- GERENCIAMENTO DE SESSÃO PERSISTENTE ---
+query_params = st.query_params
+auth_param = query_params.get("auth")
+
+# Verifica se a sessão está salva nos parâmetros da URL ou no session_state
+if auth_param == SENHA_ACESSO:
+  st.session_state.autenticado = True
+
+if "autenticado" not in st.session_state:
+  st.session_state.autenticado = False
 
 # --- TELA DE LOGIN ---
 if not st.session_state.autenticado:
@@ -192,6 +196,7 @@ if not st.session_state.autenticado:
     if btn_login:
       if senha_digitada == SENHA_ACESSO:
         st.session_state.autenticado = True
+        st.query_params["auth"] = SENHA_ACESSO  # Salva a autenticação na URL
         st.success("Acesso Autorizado!")
         st.rerun()
       else:
@@ -200,7 +205,9 @@ if not st.session_state.autenticado:
 
 # --- MENU LATERAL ---
 with st.sidebar:
-  st.markdown("<h2 style='color:#581825;'>🍷 Galpão Premium</h2>", unsafe_allow_html=True)
+  st.markdown(
+      "<h2 style='color:#581825;'>🍷 Galpão Premium</h2>", unsafe_allow_html=True
+  )
   menu = st.radio(
       "Menu:",
       [
@@ -215,9 +222,12 @@ with st.sidebar:
       ],
   )
   st.markdown("---")
+
   if st.button("🔒 Sair do Sistema", use_container_width=True):
     st.session_state.autenticado = False
+    st.query_params.clear()  # Limpa os parâmetros de autenticação
     st.rerun()
+
   st.caption(f"👨‍💻 Dev: **{NOME_DEV}**\n\n📞 {FONE_DEV}")
 
 # --- CABEÇALHO DA PÁGINA PRINCIPAL ---
@@ -231,16 +241,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 1. BUSCAR VINHO (COM BUSCA POR FOTO INTEGRADA!)
+# 1. BUSCAR VINHO
 if menu == "🔍 Buscar vinho":
   st.subheader("🔍 Localizar Vinho no Galpão")
 
-  # Abas para o usuário escolher como deseja buscar
   aba_texto, aba_foto = st.tabs(
       ["🔎 Buscar por Texto / Pallet", "📸 Buscar por Foto do Rótulo"]
   )
 
-  # --- ABA 1: BUSCA POR TEXTO ---
   with aba_texto:
     c_tipo, c_busca = st.columns([1, 2])
     with c_tipo:
@@ -280,7 +288,6 @@ if menu == "🔍 Buscar vinho":
                   base64.b64decode(v.get("foto")), caption="Rótulo", width=90
               )
 
-  # --- ABA 2: BUSCA POR FOTO (INTEGRADA AQUI) ---
   with aba_foto:
     st.write("Tire uma foto ou envie a imagem do rótulo para pesquisar:")
     foto_pesquisa = st.file_uploader(
@@ -402,7 +409,6 @@ elif menu == "➕ Cadastrar novo vinho":
         st.session_state.estoque.append(novo_vinho)
         salvar_dados(st.session_state.estoque)
 
-        # Limpa os campos automaticamente
         st.session_state.form_key += 1
         st.success(f"✅ '{nome}' cadastrado com sucesso!")
         st.rerun()
@@ -481,7 +487,9 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
 
   pallet_alvo = f"{qr_corr} - {qr_pal}"
   pallet_encoded = urllib.parse.quote_plus(pallet_alvo)
-  link_pallet = f"{URL_APLICATIVO}/?pallet={pallet_encoded}"
+  link_pallet = (
+      f"{URL_APLICATIVO}/?pallet={pallet_encoded}&auth={SENHA_ACESSO}"
+  )
   url_qr = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote(link_pallet)}"
 
   st.image(url_qr, caption=f"Etiqueta {pallet_alvo}", width=200)
