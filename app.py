@@ -3,15 +3,11 @@ import io
 import json
 import os
 import urllib.parse
+import cv2
+import numpy as np
 import pandas as pd
 import streamlit as st
 from PIL import Image
-
-# Tentativa de importação da biblioteca de leitura de QR Code no backend
-try:
-  from pyzbar.pyzbar import decode as decode_qr
-except ImportError:
-  decode_qr = None
 
 # 1. Configuração da página
 st.set_page_config(
@@ -657,35 +653,34 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
       url_qr, caption=f"Etiqueta QR Code — {pallet_alvo}", width=200
   )
 
-# 9. ESCANEAR QR CODE (SEM ERRO DE CÂMERA FRONTAL)
+# 9. ESCANEAR QR CODE (USANDO DETECTOR NATIVO DO OPENCV)
 elif menu == "📷 Escanear QR Code":
   st.subheader("📷 Escanear QR Code do Pallet")
   st.info("Aponte para a etiqueta do Pallet:")
 
-  # Câmera nativa do Streamlit (força abertura de foto rápida)
   foto_camera = st.camera_input("Tirar foto do QR Code")
 
   if foto_camera is not None:
     try:
-      img = Image.open(foto_camera)
-      if decode_qr is not None:
-        decoded_objs = decode_qr(img)
-        if decoded_objs:
-          link_qr = decoded_objs[0].data.decode("utf-8")
-          st.success("✅ QR Code lido com sucesso!")
-          st.markdown(
-              f'<meta http-equiv="refresh" content="0;url={link_qr}">',
-              unsafe_allow_html=True,
-          )
-        else:
-          st.error(
-              "⚠️ Não foi possível ler um QR Code válido na imagem. Tente"
-              " aproximar mais."
-          )
+      # Converte a imagem tirada para formato OpenCV (BGR)
+      bytes_data = foto_camera.getvalue()
+      file_bytes = np.asarray(bytearray(bytes_data), dtype=np.uint8)
+      img_cv = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+      # Detector de QR Code do OpenCV
+      detector = cv2.QRCodeDetector()
+      data, bbox, _ = detector.detectAndDecode(img_cv)
+
+      if data:
+        st.success("✅ QR Code lido com sucesso!")
+        st.markdown(
+            f'<meta http-equiv="refresh" content="0;url={data}">',
+            unsafe_allow_html=True,
+        )
       else:
-        st.warning(
-            "⚠️ Biblioteca 'pyzbar' não instalada no servidor para leitura"
-            " automática. Adicione 'pyzbar' ao seu requirements.txt."
+        st.error(
+            "⚠️ Não foi possível ler o QR Code da imagem. Certifique-se de que"
+            " a foto está focada e clara."
         )
     except Exception as e:
-      st.error(f"Erro ao processar imagem: {e}")
+      st.error(f"Erro ao ler imagem: {e}")
