@@ -26,7 +26,7 @@ except ImportError:
 # 1. Configuração da página Streamlit
 st.set_page_config(
     page_title="Mapa Estoque - Galpão Premium",
-    page_icon="logo.png",
+    page_icon="https://raw.githubusercontent.com/SEU_USUARIO/mapa-estoque-galpao-premium/main/logo.png",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
