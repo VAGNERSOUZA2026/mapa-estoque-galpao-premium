@@ -1,4 +1,4 @@
 streamlit
 pandas
-pillow
-opencv-python-headless
+qrcode
+Pillow
