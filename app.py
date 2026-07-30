@@ -5,26 +5,25 @@ import os
 import urllib.parse
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 from PIL import Image
 
-# Importações seguras para processamento de imagem e decodificação de QR Code
+# Tenta importar bibliotecas para QR Code de forma segura
 try:
   import cv2
   import numpy as np
 
   OPENCV_DISPONIVEL = True
-except ImportError:
+except Exception:
   OPENCV_DISPONIVEL = False
 
 try:
   from pyzbar.pyzbar import decode as pyzbar_decode
 
   PYZBAR_DISPONIVEL = True
-except ImportError:
+except Exception:
   PYZBAR_DISPONIVEL = False
 
-# URL da imagem no seu repositório GitHub
+# URL do Logo no GitHub
 URL_LOGO_GITHUB = "https://raw.githubusercontent.com/Vagner-Souza/mapa-estoque-galpao-premium/main/logo.png"
 
 # 1. Configuração da página Streamlit
@@ -35,7 +34,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Injeção de Meta Tags para Ícone da Tela Inicial no Celular e Navegadores
+# Injeção de Meta Tags para Ícone
 st.markdown(
     f"""
     <head>
@@ -188,47 +187,23 @@ def comparar_hashes(h1, h2):
 
 
 def decodificar_qr_code(imagem_bytes):
-  img_pil = Image.open(io.BytesIO(imagem_bytes))
-
-  if PYZBAR_DISPONIVEL:
-    try:
+  try:
+    img_pil = Image.open(io.BytesIO(imagem_bytes))
+    if PYZBAR_DISPONIVEL:
       resultados = pyzbar_decode(img_pil)
       if resultados:
         return resultados[0].data.decode("utf-8")
-    except Exception:
-      pass
+  except Exception:
+    pass
 
   if OPENCV_DISPONIVEL:
     try:
       file_bytes = np.asarray(bytearray(imagem_bytes), dtype=np.uint8)
       img_cv = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
       detector = cv2.QRCodeDetector()
-
-      data, bbox, _ = detector.detectAndDecode(img_cv)
+      data, _, _ = detector.detectAndDecode(img_cv)
       if data:
         return data
-
-      gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-      clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
-      gray_enhanced = clahe.apply(gray)
-      data, bbox, _ = detector.detectAndDecode(gray_enhanced)
-      if data:
-        return data
-
-      _, thresh = cv2.threshold(
-          gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-      )
-      data, bbox, _ = detector.detectAndDecode(thresh)
-      if data:
-        return data
-
-      _, thresh_inv = cv2.threshold(
-          gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-      )
-      data, bbox, _ = detector.detectAndDecode(thresh_inv)
-      if data:
-        return data
-
     except Exception:
       pass
 
@@ -315,7 +290,7 @@ if pallet_param:
       if v.get("foto"):
         st.image(
             base64.b64decode(v.get("foto")),
-            caption="📸 Rótulo do Vinho (Toque para Zoom)",
+            caption="📸 Rótulo do Vinho",
             use_container_width=True,
         )
         st.markdown("---")
@@ -437,11 +412,9 @@ if menu == "🔍 Buscar vinho":
               unsafe_allow_html=True,
           )
           if v.get("foto"):
-            with st.expander("🔍 Ver / Aumentar Foto do Rótulo", expanded=True):
+            with st.expander("🔍 Ver Foto do Rótulo", expanded=True):
               st.image(
-                  base64.b64decode(v.get("foto")),
-                  caption="Toque na imagem para ver em Tela Cheia",
-                  use_container_width=True,
+                  base64.b64decode(v.get("foto")), use_container_width=True
               )
           st.markdown("---")
 
@@ -455,9 +428,7 @@ if menu == "🔍 Buscar vinho":
       try:
         img_pesquisa = Image.open(foto_pesquisa)
         st.image(
-            img_pesquisa,
-            caption="Foto para Busca (Toque para Zoom)",
-            width=280,
+            img_pesquisa, caption="Foto enviada para busca", width=280
         )
 
         hash_pesquisa = calcular_hash_simples(img_pesquisa)
@@ -495,11 +466,9 @@ if menu == "🔍 Buscar vinho":
                 unsafe_allow_html=True,
             )
             if v.get("foto"):
-              with st.expander("🔍 Ver / Aumentar Foto do Rótulo"):
+              with st.expander("🔍 Ver Foto do Rótulo"):
                 st.image(
-                    base64.b64decode(v.get("foto")),
-                    caption="Rótulo Cadastrado",
-                    use_container_width=True,
+                    base64.b64decode(v.get("foto")), use_container_width=True
                 )
             st.markdown("---")
         else:
@@ -662,4 +631,36 @@ elif menu == "📥 Importar planilha (CSV/Excel)":
             item["foto"] = None
           for k, v in item.items():
             if pd.isna(v):
-              i
+              item[k] = ""
+
+        if substituir:
+          st.session_state.estoque = novos_itens
+        else:
+          st.session_state.estoque.extend(novos_itens)
+
+        salvar_dados(st.session_state.estoque)
+        st.success("🎉 Carga efetuada com sucesso!")
+        st.rerun()
+    except Exception as e:
+      st.error(f"Erro ao processar planilha: {e}")
+
+elif menu == "📤 Exportar planilha (CSV)":
+  st.subheader("📤 Baixar Planilha do Estoque")
+  if st.session_state.estoque:
+    df_export = pd.DataFrame(st.session_state.estoque)
+    if "foto" in df_export.columns:
+      df_export = df_export.drop(columns=["foto"])
+
+    csv_data = df_export.to_csv(index=False, sep=";").encode("utf-8")
+    st.download_button(
+        label="💾 Baixar Arquivo CSV",
+        data=csv_data,
+        file_name="estoque_galpao_premium.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+elif menu == "🏷️ Gerar QR Code do Pallet":
+  st.subheader("🏷️ Gerar Link / QR Code da Posição")
+
+  c_corr_qr, c_pal_qr = st.columns(
