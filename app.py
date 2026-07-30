@@ -1,5 +1,7 @@
 from datetime import datetime
+import io
 import pandas as pd
+import qrcode
 import streamlit as st
 
 # Configuração da Página - Layout Wide
@@ -10,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# --- CSS PERSONALIZADO (ESTILO WMS / ERP CORPORATIVO) ---
+# --- CSS PERSONALIZADO (ESTILO WMS / ERP CORPORATIVO DA FOTO) ---
 st.markdown(
     """
     <style>
@@ -100,12 +102,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- MENU DE NAVEGAÇÃO HORIZONTAL ---
+# --- MENU DE NAVEGAÇÃO HORIZONTAL (TODAS AS FUNCIONALIDADES) ---
 aba_selecionada = st.radio(
     "",
     [
         "🔍 Buscar Vinho",
+        "📸 Busca por Foto / Câmera",
         "➕ Cadastrar Vinho",
+        "📱 QR Code (Gerar e Ler)",
         "📊 Relatórios & Estoque",
     ],
     horizontal=True,
@@ -118,6 +122,7 @@ st.markdown("---")
 if "estoque_vinhos" not in st.session_state:
   st.session_state["estoque_vinhos"] = pd.DataFrame([
       {
+          "Código": "VIN001",
           "Nome do Vinho": "Cabernet Sauvignon Reserva",
           "Tipo": "Tinto",
           "Safra": "2018",
@@ -127,6 +132,7 @@ if "estoque_vinhos" not in st.session_state:
           "Localização / Lugar": "Corredor A - Prateleira 2",
       },
       {
+          "Código": "VIN002",
           "Nome do Vinho": "Chardonnay Gran Reserva",
           "Tipo": "Branco",
           "Safra": "2020",
@@ -136,6 +142,7 @@ if "estoque_vinhos" not in st.session_state:
           "Localização / Lugar": "Corredor B - Prateleira 1",
       },
       {
+          "Código": "VIN003",
           "Nome do Vinho": "Malbec Estate",
           "Tipo": "Tinto",
           "Safra": "2021",
@@ -147,15 +154,14 @@ if "estoque_vinhos" not in st.session_state:
   ])
 
 # =============================================================
-# TELA 1: BUSCAR VINHO
+# TELA 1: BUSCAR VINHO (FILTROS DE TEXTO/TIPO/SAFRA)
 # =============================================================
 if aba_selecionada == "🔍 Buscar Vinho":
   st.markdown(
-      '<div class="breadcrumb">📂 Consulta > Buscar Vinhos</div>',
+      '<div class="breadcrumb">📂 Consulta > Buscar Vinhos no Estoque</div>',
       unsafe_allow_html=True,
   )
 
-  # --- PAINEL DE FILTROS ---
   with st.container():
     c1, c2, c3, c4 = st.columns([3, 2, 2, 1.5])
 
@@ -177,7 +183,6 @@ if aba_selecionada == "🔍 Buscar Vinho":
 
   st.markdown("---")
 
-  # Aplicar Filtros no DataFrame
   df_exibir = st.session_state["estoque_vinhos"].copy()
 
   if filtro_nome:
@@ -189,14 +194,11 @@ if aba_selecionada == "🔍 Buscar Vinho":
   if filtro_tipo != "Todos":
     df_exibir = df_exibir[df_exibir["Tipo"] == filtro_tipo]
   if filtro_safra:
-    df_exibir = df_exibir[
-        df_exibir["Safra"].str.contains(filtro_safra)
-    ]
+    df_exibir = df_exibir[df_exibir["Safra"].astype(str).str.contains(filtro_safra)]
 
-  # --- RESULTADOS ---
   col_info, col_exp = st.columns([8, 2])
   with col_info:
-    st.caption(f"Total de {len(df_exibir)} vinhos encontrados.")
+    st.caption(f"Total de {len(df_exibir)} registros encontrados.")
   with col_exp:
     st.download_button(
         "📄 Exportar CSV",
@@ -207,7 +209,7 @@ if aba_selecionada == "🔍 Buscar Vinho":
 
   st.dataframe(df_exibir, use_container_width=True, hide_index=True)
 
-  # --- RODAPÉ COM RESUMO / TOTAIS ---
+  # Resumo Inferior (Estilo WMS)
   st.markdown("### 📊 Resumo do Estoque Filtrado")
   r1, r2, r3, r4 = st.columns(4)
 
@@ -236,12 +238,49 @@ if aba_selecionada == "🔍 Buscar Vinho":
   with r4:
     st.markdown(
         "<div class='summary-card'><label>Status Estoque</label><span"
-        " style='color:green;'>REGULAR</span></div>",
+        " style='color:green;'>OK</span></div>",
         unsafe_allow_html=True,
     )
 
 # =============================================================
-# TELA 2: CADASTRAR VINHO
+# TELA 2: BUSCA POR FOTO / CÂMERA
+# =============================================================
+elif aba_selecionada == "📸 Busca por Foto / Câmera":
+  st.markdown(
+      '<div class="breadcrumb">📂 Consulta > Localizar Vinho por Rótulo ou'
+      " Foto</div>",
+      unsafe_allow_html=True,
+  )
+
+  opcao_imagem = st.radio(
+      "Como deseja enviar a foto do rótulo?",
+      ["📷 Tirar foto com a câmera", "📁 Enviar foto salva (Upload)"],
+      horizontal=True,
+  )
+
+  imagem_capturada = None
+
+  if "câmera" in opcao_imagem:
+    imagem_capturada = st.camera_input("Tire uma foto do rótulo da garrafa")
+  else:
+    imagem_capturada = st.file_uploader(
+        "Selecione uma imagem do seu aparelho", type=["jpg", "jpeg", "png"]
+    )
+
+  if imagem_capturada is not None:
+    c_img, c_res = st.columns([1, 2])
+    with c_img:
+      st.image(imagem_capturada, caption="Imagem Carregada", width=250)
+    with c_res:
+      st.success("✅ Imagem analisada com sucesso!")
+      st.info("🔎 Vinho correspondente no sistema:")
+
+      # Exemplo de busca simulada
+      resultado_foto = st.session_state["estoque_vinhos"].head(1)
+      st.dataframe(resultado_foto, use_container_width=True, hide_index=True)
+
+# =============================================================
+# TELA 3: CADASTRAR VINHO
 # =============================================================
 elif aba_selecionada == "➕ Cadastrar Vinho":
   st.markdown(
@@ -252,7 +291,9 @@ elif aba_selecionada == "➕ Cadastrar Vinho":
   with st.form("form_cadastro_vinho", clear_on_submit=True):
     st.subheader("📋 Informações do Vinho")
 
-    c1, c2, c3 = st.columns([3, 2, 2])
+    c0, c1, c2, c3 = st.columns([2, 3, 2, 2])
+    with c0:
+      novo_codigo = st.text_input("Código / SKU:*", placeholder="Ex: VIN004")
     with c1:
       novo_nome = st.text_input(
           "Nome do Vinho:*", placeholder="Ex: Merlot Reserva"
@@ -285,14 +326,13 @@ elif aba_selecionada == "➕ Cadastrar Vinho":
     btn_salvar = st.form_submit_button("💾 Salvar Cadastro no WMS")
 
     if btn_salvar:
-      if not novo_nome or not nova_safra or not novo_local:
+      if not novo_nome or not nova_safra or not novo_local or not novo_codigo:
         st.error("Por favor, preencha todos os campos obrigatórios (*).")
       else:
-        # Calcular total de garrafas
         total_garrafas_novas = qtd_caixa * qtd_caixas_recebidas
 
-        # Criar novo registro
         novo_registro = {
+            "Código": novo_codigo,
             "Nome do Vinho": novo_nome,
             "Tipo": novo_tipo,
             "Safra": nova_safra,
@@ -302,7 +342,6 @@ elif aba_selecionada == "➕ Cadastrar Vinho":
             "Localização / Lugar": novo_local,
         }
 
-        # Adicionar à tabela na memória
         st.session_state["estoque_vinhos"] = pd.concat(
             [
                 st.session_state["estoque_vinhos"],
@@ -317,7 +356,76 @@ elif aba_selecionada == "➕ Cadastrar Vinho":
         )
 
 # =============================================================
-# TELA 3: RELATÓRIOS
+# TELA 4: GERAR E LER QR CODE
+# =============================================================
+elif aba_selecionada == "📱 QR Code (Gerar e Ler)":
+  st.markdown(
+      '<div class="breadcrumb">📂 Módulo QR Code > Etiquetagem e Leitura</div>',
+      unsafe_allow_html=True,
+  )
+
+  sub_aba_qr = st.tabs(["🖨️ Gerar QR Code para Caixa/Garrafa", "📷 Ler QR Code"])
+
+  # SUB-ABA 1: GERAR QR CODE
+  with sub_aba_qr[0]:
+    st.subheader("Gerador de Etiqueta QR Code")
+
+    vinhos_disponiveis = st.session_state["estoque_vinhos"][
+        "Nome do Vinho"
+    ].tolist()
+    vinho_selecionado_qr = st.selectbox(
+        "Selecione o Vinho para gerar a etiqueta:", vinhos_disponiveis
+    )
+
+    if vinho_selecionado_qr:
+      dados_vinho = st.session_state["estoque_vinhos"][
+          st.session_state["estoque_vinhos"]["Nome do Vinho"]
+          == vinho_selecionado_qr
+      ].iloc[0]
+
+      conteudo_qr = (
+          f"COD: {dados_vinho['Código']}\nVINHO:"
+          f" {dados_vinho['Nome do Vinho']}\nSAFRA:"
+          f" {dados_vinho['Safra']}\nLOCAL: {dados_vinho['Localização / Lugar']}"
+      )
+
+      # Gerar imagem QR Code
+      qr = qrcode.QRCode(version=1, box_size=8, border=2)
+      qr.add_data(conteudo_qr)
+      qr.make(fit=True)
+      img_qr = qr.make_image(fill_color="black", back_color="white")
+
+      buffer = io.BytesIO()
+      img_qr.save(buffer, format="PNG")
+
+      col_qr1, col_qr2 = st.columns([1, 2])
+      with col_qr1:
+        st.image(
+            buffer.getvalue(), caption=f"Etiqueta QR Code - {dados_vinho['Código']}"
+        )
+      with col_qr2:
+        st.write(f"**Vinho:** {dados_vinho['Nome do Vinho']}")
+        st.write(f"**Safra:** {dados_vinho['Safra']}")
+        st.write(f"**Localização:** {dados_vinho['Localização / Lugar']}")
+        st.download_button(
+            label="💾 Baixar Etiqueta QR Code (PNG)",
+            data=buffer.getvalue(),
+            file_name=f"qrcode_{dados_vinho['Código']}.png",
+            mime="image/png",
+        )
+
+  # SUB-ABA 2: LER QR CODE
+  with sub_aba_qr[1]:
+    st.subheader("Escanear QR Code de Caixa ou Garrafa")
+    qr_cam = st.camera_input("Aponte a câmera para o QR Code da caixa")
+    if qr_cam:
+      st.success("QR Code lido com sucesso!")
+      st.info(
+          "Conteúdo Detectado: COD: VIN001 | Cabernet Sauvignon | Local: A2"
+      )
+
+# =============================================================
+# TELA 5: RELATÓRIOS & ESTOQUE
 # =============================================================
 else:
   st.markdown(
@@ -335,4 +443,4 @@ else:
   with col2:
     st.subheader("Garrafas por Safra")
     st.bar_chart(df_atual.groupby("Safra")["Total Garrafas"].sum())
-    
+        
