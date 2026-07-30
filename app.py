@@ -1,4 +1,4 @@
-Import base64
+import base64
 import io
 import json
 import os
@@ -10,19 +10,19 @@ from PIL import Image
 
 # Importações seguras para processamento de imagem e decodificação de QR Code
 try:
-  import cv2
-  import numpy as np
+    import cv2
+    import numpy as np
 
-  OPENCV_DISPONIVEL = True
+    OPENCV_DISPONIVEL = True
 except ImportError:
-  OPENCV_DISPONIVEL = False
+    OPENCV_DISPONIVEL = False
 
 try:
-  from pyzbar.pyzbar import decode as pyzbar_decode
+    from pyzbar.pyzbar import decode as pyzbar_decode
 
-  PYZBAR_DISPONIVEL = True
+    PYZBAR_DISPONIVEL = True
 except ImportError:
-  PYZBAR_DISPONIVEL = False
+    PYZBAR_DISPONIVEL = False
 
 # URL da imagem no seu repositório GitHub
 URL_LOGO_GITHUB = "https://raw.githubusercontent.com/Vagner-Souza/mapa-estoque-galpao-premium/main/logo.png"
@@ -150,214 +150,214 @@ estoque_padrao = [{
 
 
 def carregar_dados():
-  if os.path.exists(NOME_ARQUIVO):
-    try:
-      with open(NOME_ARQUIVO, "r", encoding="utf-8") as f:
-        dados = json.load(f)
-        if isinstance(dados, list) and len(dados) > 0:
-          return dados
-    except Exception:
-      pass
-  return [dict(item) for item in estoque_padrao]
+    if os.path.exists(NOME_ARQUIVO):
+        try:
+            with open(NOME_ARQUIVO, "r", encoding="utf-8") as f:
+                dados = json.load(f)
+                if isinstance(dados, list) and len(dados) > 0:
+                    return dados
+        except Exception:
+            pass
+    return [dict(item) for item in estoque_padrao]
 
 
 def salvar_dados(estoque):
-  try:
-    with open(NOME_ARQUIVO, "w", encoding="utf-8") as f:
-      json.dump(estoque, f, ensure_ascii=False, indent=4)
-  except Exception as e:
-    st.error(f"Erro ao salvar dados: {e}")
+    try:
+        with open(NOME_ARQUIVO, "w", encoding="utf-8") as f:
+            json.dump(estoque, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        st.error(f"Erro ao salvar dados: {e}")
 
 
 def converter_imagem_base64(uploaded_file):
-  if uploaded_file is not None:
-    bytes_data = uploaded_file.getvalue()
-    return base64.b64encode(bytes_data).decode("utf-8")
-  return None
+    if uploaded_file is not None:
+        bytes_data = uploaded_file.getvalue()
+        return base64.b64encode(bytes_data).decode("utf-8")
+    return None
 
 
 def calcular_hash_simples(img):
-  img = img.convert("L").resize((8, 8), Image.Resampling.LANCZOS)
-  pixels = list(img.getdata())
-  media = sum(pixels) / len(pixels)
-  return "".join(["1" if p > media else "0" for p in pixels])
+    img = img.convert("L").resize((8, 8), Image.Resampling.LANCZOS)
+    pixels = list(img.getdata())
+    media = sum(pixels) / len(pixels)
+    return "".join(["1" if p > media else "0" for p in pixels])
 
 
 def comparar_hashes(h1, h2):
-  return sum(c1 != c2 for c1, c2 in zip(h1, h2))
+    return sum(c1 != c2 for c1, c2 in zip(h1, h2))
 
 
 def decodificar_qr_code(imagem_bytes):
-  img_pil = Image.open(io.BytesIO(imagem_bytes))
+    img_pil = Image.open(io.BytesIO(imagem_bytes))
 
-  if PYZBAR_DISPONIVEL:
-    try:
-      resultados = pyzbar_decode(img_pil)
-      if resultados:
-        return resultados[0].data.decode("utf-8")
-    except Exception:
-      pass
+    if PYZBAR_DISPONIVEL:
+        try:
+            resultados = pyzbar_decode(img_pil)
+            if resultados:
+                return resultados[0].data.decode("utf-8")
+        except Exception:
+            pass
 
-  if OPENCV_DISPONIVEL:
-    try:
-      file_bytes = np.asarray(bytearray(imagem_bytes), dtype=np.uint8)
-      img_cv = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-      detector = cv2.QRCodeDetector()
+    if OPENCV_DISPONIVEL:
+        try:
+            file_bytes = np.asarray(bytearray(imagem_bytes), dtype=np.uint8)
+            img_cv = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            detector = cv2.QRCodeDetector()
 
-      data, bbox, _ = detector.detectAndDecode(img_cv)
-      if data:
-        return data
+            data, bbox, _ = detector.detectAndDecode(img_cv)
+            if data:
+                return data
 
-      gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-      clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
-      gray_enhanced = clahe.apply(gray)
-      data, bbox, _ = detector.detectAndDecode(gray_enhanced)
-      if data:
-        return data
+            gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+            clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+            gray_enhanced = clahe.apply(gray)
+            data, bbox, _ = detector.detectAndDecode(gray_enhanced)
+            if data:
+                return data
 
-      _, thresh = cv2.threshold(
-          gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-      )
-      data, bbox, _ = detector.detectAndDecode(thresh)
-      if data:
-        return data
+            _, thresh = cv2.threshold(
+                gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+            )
+            data, bbox, _ = detector.detectAndDecode(thresh)
+            if data:
+                return data
 
-      _, thresh_inv = cv2.threshold(
-          gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-      )
-      data, bbox, _ = detector.detectAndDecode(thresh_inv)
-      if data:
-        return data
+            _, thresh_inv = cv2.threshold(
+                gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+            )
+            data, bbox, _ = detector.detectAndDecode(thresh_inv)
+            if data:
+                return data
 
-    except Exception:
-      pass
+        except Exception:
+            pass
 
-  return None
+    return None
 
 
 # --- ESTADO DE SESSÃO ---
 if "estoque" not in st.session_state:
-  st.session_state.estoque = carregar_dados()
+    st.session_state.estoque = carregar_dados()
 
 if "form_key" not in st.session_state:
-  st.session_state.form_key = 0
+    st.session_state.form_key = 0
 
 query_params = st.query_params
 auth_param = query_params.get("auth")
 pallet_param = query_params.get("pallet")
 
 if auth_param == SENHA_ACESSO:
-  st.session_state.autenticado = True
+    st.session_state.autenticado = True
 
 if "autenticado" not in st.session_state:
-  st.session_state.autenticado = False
+    st.session_state.autenticado = False
 
 # --- TELA DE LOGIN ---
 if not st.session_state.autenticado:
-  st.markdown(
-      """
+    st.markdown(
+        """
         <div class="header-container">
             <h1 class="main-title">🍷 GALPÃO PREMIUM</h1>
             <p class="sub-title">Controle de Estoque e Localização</p>
         </div>
     """,
-      unsafe_allow_html=True,
-  )
-
-  with st.form("login_form"):
-    senha_digitada = st.text_input("🔑 Senha de Acesso:", type="password")
-    btn_login = st.form_submit_button(
-        "Entrar no Sistema", use_container_width=True
+        unsafe_allow_html=True,
     )
 
-    if btn_login:
-      if senha_digitada == SENHA_ACESSO:
-        st.session_state.autenticado = True
-        st.query_params["auth"] = SENHA_ACESSO
-        st.success("Acesso Autorizado!")
-        st.rerun()
-      else:
-        st.error("Senha incorreta!")
-  st.stop()
+    with st.form("login_form"):
+        senha_digitada = st.text_input("🔑 Senha de Acesso:", type="password")
+        btn_login = st.form_submit_button(
+            "Entrar no Sistema", use_container_width=True
+        )
+
+        if btn_login:
+            if senha_digitada == SENHA_ACESSO:
+                st.session_state.autenticado = True
+                st.query_params["auth"] = SENHA_ACESSO
+                st.success("Acesso Autorizado!")
+                st.rerun()
+            else:
+                st.error("Senha incorreta!")
+    st.stop()
 
 # --- CONSULTA DIRETA VIA LINK DE QR CODE ---
 if pallet_param:
-  pallet_nome = urllib.parse.unquote_plus(pallet_param)
-  st.markdown(
-      f"""
+    pallet_nome = urllib.parse.unquote_plus(pallet_param)
+    st.markdown(
+        f"""
     <div class="header-container">
         <h1 class="main-title">📍 RESULTADO DO PALLET</h1>
         <p class="sub-title">Consultando: <b>{pallet_nome}</b></p>
     </div>
     """,
-      unsafe_allow_html=True,
-  )
-
-  vinhos_no_pallet = [
-      v for v in st.session_state.estoque if v.get("pallet") == pallet_nome
-  ]
-
-  if vinhos_no_pallet:
-    st.success(
-        f"📦 Encontrado(s) {len(vinhos_no_pallet)} vinho(s) nesta posição:"
+        unsafe_allow_html=True,
     )
-    for v in vinhos_no_pallet:
-      st.markdown(
-          f"""
+
+    vinhos_no_pallet = [
+        v for v in st.session_state.estoque if v.get("pallet") == pallet_nome
+    ]
+
+    if vinhos_no_pallet:
+        st.success(
+            f"📦 Encontrado(s) {len(vinhos_no_pallet)} vinho(s) nesta posição:"
+        )
+        for v in vinhos_no_pallet:
+            st.markdown(
+                f"""
             <div class="wine-card">
                 <div class="wine-title">🍷 {v.get('nome')} ({v.get('safra')})</div>
                 <p><span class="badge-pallet">📍 {v.get('pallet')}</span> <span class="badge-info">Lado: {v.get('lado')}</span></p>
                 <p style="margin-top:8px; font-size:0.9rem;"><b>Tipo:</b> {v.get('tipo')} | <b>Embalagem:</b> {v.get('caixa')}</p>
             </div>
             """,
-          unsafe_allow_html=True,
-      )
-      if v.get("foto"):
-        st.image(
-            base64.b64decode(v.get("foto")),
-            caption="📸 Rótulo do Vinho (Toque para Zoom)",
-            use_container_width=True,
-        )
-        st.markdown("---")
-  else:
-    st.warning(f"⚠️ Nenhum vinho cadastrado no **{pallet_nome}** até o momento.")
+                unsafe_allow_html=True,
+            )
+            if v.get("foto"):
+                st.image(
+                    base64.b64decode(v.get("foto")),
+                    caption="📸 Rótulo do Vinho (Toque para Zoom)",
+                    use_container_width=True,
+                )
+                st.markdown("---")
+    else:
+        st.warning(f"⚠️ Nenhum vinho cadastrado no **{pallet_nome}** até o momento.")
 
-  if st.button("⬅️ Voltar ao Painel Principal", use_container_width=True):
-    st.query_params.clear()
-    st.query_params["auth"] = SENHA_ACESSO
-    st.rerun()
+    if st.button("⬅️ Voltar ao Painel Principal", use_container_width=True):
+        st.query_params.clear()
+        st.query_params["auth"] = SENHA_ACESSO
+        st.rerun()
 
-  st.stop()
+    st.stop()
 
 # --- MENU LATERAL ---
 with st.sidebar:
-  st.markdown(
-      "<h2 style='color:#581825;'>🍷 Galpão Premium</h2>", unsafe_allow_html=True
-  )
+    st.markdown(
+        "<h2 style='color:#581825;'>🍷 Galpão Premium</h2>", unsafe_allow_html=True
+    )
 
-  menu = st.radio(
-      "Menu Principal:",
-      [
-          "🔍 Buscar vinho",
-          "🍷 Ver estoque completo",
-          "➕ Cadastrar novo vinho",
-          "✏️ Editar vinho",
-          "🗑️ Excluir vinho",
-          "📥 Importar planilha (CSV/Excel)",
-          "📤 Exportar planilha (CSV)",
-          "🏷️ Gerar QR Code do Pallet",
-          "📷 Escanear QR Code",
-      ],
-  )
-  st.markdown("---")
+    menu = st.radio(
+        "Menu Principal:",
+        [
+            "🔍 Buscar vinho",
+            "🍷 Ver estoque completo",
+            "➕ Cadastrar novo vinho",
+            "✏️ Editar vinho",
+            "🗑️ Excluir vinho",
+            "📥 Importar planilha (CSV/Excel)",
+            "📤 Exportar planilha (CSV)",
+            "🏷️ Gerar QR Code do Pallet",
+            "📷 Escanear QR Code",
+        ],
+    )
+    st.markdown("---")
 
-  if st.button("🔒 Sair do Sistema", use_container_width=True):
-    st.session_state.autenticado = False
-    st.query_params.clear()
-    st.rerun()
+    if st.button("🔒 Sair do Sistema", use_container_width=True):
+        st.session_state.autenticado = False
+        st.query_params.clear()
+        st.rerun()
 
-  st.markdown(
-      f"""
+    st.markdown(
+        f"""
         <div style="
             background: linear-gradient(135deg, #581825 0%, #2D0C13 100%);
             padding: 14px;
@@ -383,8 +383,8 @@ with st.sidebar:
             </div>
         </div>
     """,
-      unsafe_allow_html=True,
-  )
+        unsafe_allow_html=True,
+    )
 
 # --- CABEÇALHO PRINCIPAL ---
 st.markdown(
@@ -399,267 +399,213 @@ st.markdown(
 
 # --- NAVEGAÇÃO ENTRE TELAS DO MENU ---
 if menu == "🔍 Buscar vinho":
-  st.subheader("🔍 Localizar Vinho no Galpão")
+    st.subheader("🔍 Localizar Vinho no Galpão")
 
-  aba_texto, aba_foto = st.tabs(
-      ["🔎 Buscar por Texto / Pallet", "📸 Buscar por Foto do Rótulo"]
-  )
+    aba_texto, aba_foto = st.tabs(
+        ["🔎 Buscar por Texto / Pallet", "📸 Buscar por Foto do Rótulo"]
+    )
 
-  with aba_texto:
-    c_tipo, c_busca = st.columns([1, 2])
-    with c_tipo:
-      sub_op = st.selectbox(
-          "Filtrar por:",
-          ["Por Nome", "Por Tipo", "Por Safra", "Por Pallet / Corredor"],
-      )
-    with c_busca:
-      termo = st.text_input("Digite o que procura:").strip().lower()
+    with aba_texto:
+        c_tipo, c_busca = st.columns([1, 2])
+        with c_tipo:
+            sub_op = st.selectbox(
+                "Filtrar por:",
+                ["Por Nome", "Por Tipo", "Por Safra", "Por Pallet / Corredor"],
+            )
+        with c_busca:
+            termo = st.text_input("Digite o que procura:").strip().lower()
 
-    if termo:
-      resultados = [
-          v
-          for v in st.session_state.estoque
-          if termo in str(v.get(sub_op.split()[-1].lower(), "")).lower()
-          or termo in str(v.get("nome", "")).lower()
-      ]
-      if not resultados:
-        st.warning("⚠️ Nenhum vinho encontrado.")
-      else:
-        for v in resultados:
-          st.markdown(
-              f"""
+        if termo:
+            resultados = [
+                v
+                for v in st.session_state.estoque
+                if termo in str(v.get(sub_op.split()[-1].lower(), "")).lower()
+                or termo in str(v.get("nome", "")).lower()
+            ]
+            if not resultados:
+                st.warning("⚠️ Nenhum vinho encontrado.")
+            else:
+                for v in resultados:
+                    st.markdown(
+                        f"""
                     <div class="wine-card">
                         <div class="wine-title">🍷 {v.get('nome')} ({v.get('safra')})</div>
                         <p><span class="badge-pallet">📍 {v.get('pallet')}</span> <span class="badge-info">Lado: {v.get('lado')}</span></p>
                         <p style="margin-top:8px; font-size:0.9rem;"><b>Tipo:</b> {v.get('tipo')} | <b>Embalagem:</b> {v.get('caixa')}</p>
                     </div>
                     """,
-              unsafe_allow_html=True,
-          )
-          if v.get("foto"):
-            with st.expander("🔍 Ver / Aumentar Foto do Rótulo", expanded=True):
-              st.image(
-                  base64.b64decode(v.get("foto")),
-                  caption="Toque na imagem para ver em Tela Cheia",
-                  use_container_width=True,
-              )
-          st.markdown("---")
+                        unsafe_allow_html=True,
+                    )
+                    if v.get("foto"):
+                        with st.expander("🔍 Ver / Aumentar Foto do Rótulo", expanded=True):
+                            st.image(
+                                base64.b64decode(v.get("foto")),
+                                caption="Toque na imagem para ver em Tela Cheia",
+                                use_container_width=True,
+                            )
+                    st.markdown("---")
 
-  with aba_foto:
-    st.write("Tire uma foto ou envie a imagem do rótulo para pesquisar:")
-    foto_pesquisa = st.file_uploader(
-        "Selecione a foto da garrafa:", type=["jpg", "jpeg", "png"]
-    )
-
-    if foto_pesquisa is not None:
-      try:
-        img_pesquisa = Image.open(foto_pesquisa)
-        st.image(
-            img_pesquisa,
-            caption="Foto para Busca (Toque para Zoom)",
-            width=280,
+    with aba_foto:
+        st.write("Tire uma foto ou envie a imagem do rótulo para pesquisar:")
+        foto_pesquisa = st.file_uploader(
+            "Selecione a foto da garrafa:", type=["jpg", "jpeg", "png"]
         )
 
-        hash_pesquisa = calcular_hash_simples(img_pesquisa)
-        encontrados = []
-
-        for item in st.session_state.estoque:
-          if item.get("foto"):
+        if foto_pesquisa is not None:
             try:
-              bytes_banco = base64.b64decode(item["foto"])
-              img_banco = Image.open(io.BytesIO(bytes_banco))
-              hash_banco = calcular_hash_simples(img_banco)
+                img_pesquisa = Image.open(foto_pesquisa)
+                st.image(
+                    img_pesquisa,
+                    caption="Foto para Busca (Toque para Zoom)",
+                    width=280,
+                )
 
-              dif = comparar_hashes(hash_pesquisa, hash_banco)
-              if dif <= 18:
-                encontrados.append((dif, item))
-            except Exception:
-              pass
+                hash_pesquisa = calcular_hash_simples(img_pesquisa)
+                encontrados = []
 
-        encontrados.sort(key=lambda x: x[0])
+                for item in st.session_state.estoque:
+                    if item.get("foto"):
+                        try:
+                            bytes_banco = base64.b64decode(item["foto"])
+                            img_banco = Image.open(io.BytesIO(bytes_banco))
+                            hash_banco = calcular_hash_simples(img_banco)
 
-        st.markdown("---")
-        if encontrados:
-          st.success(
-              f"🎯 Encontrado(s) {len(encontrados)} resultado(s) parecido(s):"
-          )
-          for diff, v in encontrados:
-            st.markdown(
-                f"""
+                            dif = comparar_hashes(hash_pesquisa, hash_banco)
+                            if dif <= 18:
+                                encontrados.append((dif, item))
+                        except Exception:
+                            pass
+
+                encontrados.sort(key=lambda x: x[0])
+
+                st.markdown("---")
+                if encontrados:
+                    st.success(
+                        f"🎯 Encontrado(s) {len(encontrados)} resultado(s) parecido(s):"
+                    )
+                    for diff, v in encontrados:
+                        st.markdown(
+                            f"""
                         <div class="wine-card">
                             <div class="wine-title">🍷 {v.get('nome')}</div>
                             <p><span class="badge-pallet">📍 {v.get('pallet')}</span> <span class="badge-info">Lado: {v.get('lado')}</span></p>
                             <p style="margin-top:8px; font-size:0.9rem;"><b>Safra:</b> {v.get('safra')} | <b>Caixa:</b> {v.get('caixa')}</p>
                         </div>
                         """,
-                unsafe_allow_html=True,
-            )
-            if v.get("foto"):
-              with st.expander("🔍 Ver / Aumentar Foto do Rótulo"):
-                st.image(
-                    base64.b64decode(v.get("foto")),
-                    caption="Rótulo Cadastrado",
-                    use_container_width=True,
-                )
-            st.markdown("---")
-        else:
-          st.warning(
-              "⚠️ Nenhum vinho idêntico ou similar encontrado no cadastro."
-          )
-      except Exception as e:
-        st.error(f"Erro ao processar foto: {e}")
+                            unsafe_allow_html=True,
+                        )
+                        if v.get("foto"):
+                            with st.expander("🔍 Ver / Aumentar Foto do Rótulo"):
+                                st.image(
+                                    base64.b64decode(v.get("foto")),
+                                    caption="Rótulo Cadastrado",
+                                    use_container_width=True,
+                                )
+                        st.markdown("---")
+                else:
+                    st.warning(
+                        "⚠️ Nenhum vinho idêntico ou similar encontrado no cadastro."
+                    )
+            except Exception as e:
+                st.error(f"Erro ao processar foto: {e}")
 
 elif menu == "🍷 Ver estoque completo":
-  st.subheader("📋 Tabela do Estoque Completo")
-  if st.session_state.estoque:
-    df = pd.DataFrame(st.session_state.estoque)
-    if "foto" in df.columns:
-      df = df.drop(columns=["foto"])
-    st.dataframe(df, use_container_width=True)
+    st.subheader("📋 Tabela do Estoque Completo")
+    if st.session_state.estoque:
+        df = pd.DataFrame(st.session_state.estoque)
+        if "foto" in df.columns:
+            df = df.drop(columns=["foto"])
+        st.dataframe(df, use_container_width=True)
 
 elif menu == "➕ Cadastrar novo vinho":
-  st.subheader("➕ Novo Cadastro no Galpão")
+    st.subheader("➕ Novo Cadastro no Galpão")
 
-  with st.form(f"form_cadastrar_{st.session_state.form_key}"):
-    nome = st.text_input("Nome do Vinho / Marca:").strip()
+    with st.form(f"form_cadastrar_{st.session_state.form_key}"):
+        nome = st.text_input("Nome do Vinho / Marca:").strip()
 
-    c_tipo, c_safra = st.columns(2)
-    with c_tipo:
-      tipo = st.text_input("Tipo (ex: Tinto, Branco):").strip()
-    with c_safra:
-      safra = st.selectbox("📅 Safra:", OPCOES_SAFRA)
+        c_tipo, c_safra = st.columns(2)
+        with c_tipo:
+            tipo = st.text_input("Tipo (ex: Tinto, Branco):").strip()
+        with c_safra:
+            safra = st.selectbox("📅 Safra:", OPCOES_SAFRA)
 
-    c_corr, c_pal, c_lad = st.columns(3)
-    with c_corr:
-      sel_corredor = st.selectbox("🛣️ Corredor:", LISTA_CORREDORES)
-    with c_pal:
-      sel_pallet = st.selectbox("📦 Pos./Pallet:", LISTA_PALLETS)
-    with c_lad:
-      lado = st.selectbox("↔️ Lado:", LISTA_LADOS)
+        c_corr, c_pal, c_lad = st.columns(3)
+        with c_corr:
+            sel_corredor = st.selectbox("🛣️ Corredor:", LISTA_CORREDORES)
+        with c_pal:
+            sel_pallet = st.selectbox("📦 Pos./Pallet:", LISTA_PALLETS)
+        with c_lad:
+            lado = st.selectbox("↔️ Lado:", LISTA_LADOS)
 
-    c_cx, c_vol = st.columns(2)
-    with c_cx:
-      caixa = st.selectbox("📦 Formato da Caixa:", OPCOES_CAIXA)
-    with c_vol:
-      volume = st.selectbox("🧪 Volume:", ["750ml", "375ml", "1500ml"])
+        c_cx, c_vol = st.columns(2)
+        with c_cx:
+            caixa = st.selectbox("📦 Formato da Caixa:", OPCOES_CAIXA)
+        with c_vol:
+            volume = st.selectbox("🧪 Volume:", ["750ml", "375ml", "1500ml"])
 
-    foto_upload = st.file_uploader(
-        "📸 Foto do Rótulo (Opcional):", type=["jpg", "jpeg", "png"]
-    )
+        foto_upload = st.file_uploader(
+            "📸 Foto do Rótulo (Opcional):", type=["jpg", "jpeg", "png"]
+        )
 
-    btn_salvar = st.form_submit_button(
-        "✅ Salvar Vinho", use_container_width=True
-    )
+        btn_salvar = st.form_submit_button(
+            "✅ Salvar Vinho", use_container_width=True
+        )
 
-    if btn_salvar:
-      pallet_final = f"{sel_corredor} - {sel_pallet}"
-      if nome and tipo:
-        foto_b64 = converter_imagem_base64(foto_upload)
+        if btn_salvar:
+            pallet_final = f"{sel_corredor} - {sel_pallet}"
+            if nome and tipo:
+                foto_b64 = converter_imagem_base64(foto_upload)
 
-        novo_vinho = {
-            "nome": nome,
-            "tipo": tipo,
-            "safra": safra,
-            "pallet": pallet_final,
-            "lado": lado,
-            "caixa": caixa,
-            "volume": volume,
-            "foto": foto_b64,
-        }
-        st.session_state.estoque.append(novo_vinho)
-        salvar_dados(st.session_state.estoque)
+                novo_vinho = {
+                    "nome": nome,
+                    "tipo": tipo,
+                    "safra": safra,
+                    "pallet": pallet_final,
+                    "lado": lado,
+                    "caixa": caixa,
+                    "volume": volume,
+                    "foto": foto_b64,
+                }
+                st.session_state.estoque.append(novo_vinho)
+                salvar_dados(st.session_state.estoque)
 
-        st.session_state.form_key += 1
-        st.success(f"✅ '{nome}' cadastrado com sucesso!")
-        st.rerun()
-      else:
-        st.error("⚠️ Preencha pelo menos o Nome e o Tipo.")
+                st.session_state.form_key += 1
+                st.success(f"✅ '{nome}' cadastrado com sucesso!")
+                st.rerun()
+            else:
+                st.error("⚠️ Preencha pelo menos o Nome e o Tipo.")
 
 elif menu == "✏️ Editar vinho":
-  st.subheader("✏️ Alterar Cadastro")
-  if st.session_state.estoque:
-    opcoes = [
-        f"{i + 1}. {v.get('nome')} - {v.get('pallet')}"
-        for i, v in enumerate(st.session_state.estoque)
-    ]
-    idx = st.selectbox(
-        "Selecione:", range(len(opcoes)), format_func=lambda x: opcoes[x]
-    )
-    vinho = st.session_state.estoque[idx]
+    st.subheader("✏️ Alterar Cadastro")
+    if st.session_state.estoque:
+        opcoes = [
+            f"{i + 1}. {v.get('nome')} - {v.get('pallet')}"
+            for i, v in enumerate(st.session_state.estoque)
+        ]
+        idx = st.selectbox(
+            "Selecione:", range(len(opcoes)), format_func=lambda x: opcoes[x]
+        )
+        vinho = st.session_state.estoque[idx]
 
-    with st.form("form_edit"):
-      novo_nome = st.text_input("Nome:", vinho.get("nome"))
-      novo_pallet = st.text_input("Pallet:", vinho.get("pallet"))
-      nova_caixa = st.selectbox("Caixa:", OPCOES_CAIXA)
-      foto_nova = st.file_uploader(
-          "Atualizar Foto:", type=["jpg", "jpeg", "png"]
-      )
+        with st.form("form_edit"):
+            novo_nome = st.text_input("Nome:", vinho.get("nome"))
+            novo_pallet = st.text_input("Pallet:", vinho.get("pallet"))
+            nova_caixa = st.selectbox("Caixa:", OPCOES_CAIXA)
+            foto_nova = st.file_uploader(
+                "Atualizar Foto:", type=["jpg", "jpeg", "png"]
+            )
 
-      if st.form_submit_button("💾 Salvar"):
-        vinho["nome"] = novo_nome
-        vinho["pallet"] = novo_pallet
-        vinho["caixa"] = nova_caixa
-        if foto_nova is not None:
-          vinho["foto"] = converter_imagem_base64(foto_nova)
+            if st.form_submit_button("💾 Salvar"):
+                vinho["nome"] = novo_nome
+                vinho["pallet"] = novo_pallet
+                vinho["caixa"] = nova_caixa
+                if foto_nova is not None:
+                    vinho["foto"] = converter_imagem_base64(foto_nova)
 
-        salvar_dados(st.session_state.estoque)
-        st.success("Atualizado!")
-        st.rerun()
+                salvar_dados(st.session_state.estoque)
+                st.success("Atualizado!")
+                st.rerun()
 
 elif menu == "🗑️ Excluir vinho":
-  st.subheader("🗑️ Remover do Estoque")
-  if st.session_state.estoque:
-    opcoes = [
-        f"{v.get('nome')} - {v.get('pallet')}"
-        for v in st.session_state.estoque
-    ]
-    idx = st.selectbox(
-        "Escolha para apagar:",
-        range(len(opcoes)),
-        format_func=lambda x: opcoes[x],
-    )
-    if st.button("❌ Apagar Registro", type="primary"):
-      st.session_state.estoque.pop(idx)
-      salvar_dados(st.session_state.estoque)
-      st.success("Removido!")
-      st.rerun()
-
-elif menu == "📥 Importar planilha (CSV/Excel)":
-  st.subheader("📥 Carga em Lote por Planilha")
-  st.info(
-      "Suba um arquivo **.csv** ou **.xlsx** contendo as colunas: `nome`,"
-      " `tipo`, `safra`, `pallet`, `lado`, `caixa`, `volume`."
-  )
-
-  arquivo_planilha = st.file_uploader(
-      "Escolha o arquivo CSV ou Excel:", type=["csv", "xlsx"]
-  )
-  substituir = st.checkbox(
-      "⚠️ Apagar o estoque atual e substituir por este arquivo."
-  )
-
-  if arquivo_planilha is not None:
-    try:
-      if arquivo_planilha.name.endswith(".csv"):
-        try:
-          df_import = pd.read_csv(arquivo_planilha, sep=";")
-          if "nome" not in df_import.columns:
-            arquivo_planilha.seek(0)
-            df_import = pd.read_csv(arquivo_planilha, sep=",")
-        except Exception:
-          df_import = pd.read_csv(arquivo_planilha)
-      else:
-        df_import = pd.read_excel(arquivo_planilha)
-
-      st.write("👀 Prévia dos dados encontrados:")
-      st.dataframe(df_import.head(10), use_container_width=True)
-
-      if st.button("🚀 Confirmar Importação de Dados", use_container_width=True):
-        novos_itens = df_import.to_dict(orient="records")
-
-        for item in novos_itens:
-          if "foto" not in item or pd.isna(item["foto"]):
-            item["foto"] = None
-          for k, v in item.items():
-            if pd.isna(v):
-              i
+    st.subheader("🗑️ Remover do Estoque")
+    if st.s
