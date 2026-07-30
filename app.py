@@ -105,8 +105,13 @@ st.markdown(
         display: inline-block;
     }
     @media print {
-        .sidebar, .stButton, header, footer, .stSelectbox {
+        header, footer, .sidebar, .stButton, .stSelectbox, div[data-testid="stSidebar"], div[data-testid="stHeader"] {
             display: none !important;
+        }
+        .printable-etiqueta {
+            display: block !important;
+            text-align: center;
+            padding: 20px;
         }
     }
     </style>
@@ -738,24 +743,12 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
     )
 
   with col_acoes:
-    st.markdown("### 🖨️ Opções da Etiqueta")
+    st.markdown("### 🖨️ Opções de Impressão")
     st.write(f"**Posição:** {pallet_alvo}")
 
+    # Método compatível com Navegadores Desktop e Mobile
     btn_html_print = f"""
-            <script>
-            function imprimirEtiquetaDireto() {{
-                var printWindow = window.open('', '_blank');
-                printWindow.document.write('<html><head><title>Imprimir Etiqueta - {pallet_alvo}</title>');
-                printWindow.document.write('<style>body{{text-align:center; font-family:sans-serif; padding:20px;}} img{{width:280px; height:280px;}} h2{{margin-bottom:5px; color:#581825;}}</style>');
-                printWindow.document.write('</head><body>');
-                printWindow.document.write('<h2>GALPÃO PREMIUM</h2>');
-                printWindow.document.write('<h3>{pallet_alvo}</h3>');
-                printWindow.document.write('<img src="{url_qr}" onload="window.print(); window.close();" />');
-                printWindow.document.write('</body></html>');
-                printWindow.document.close();
-            }}
-            </script>
-            <button onclick="imprimirEtiquetaDireto()" style="
+            <button onclick="window.print()" style="
                 width: 100%;
                 background-color: #581825;
                 color: white;
@@ -768,13 +761,13 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
                 cursor: pointer;
                 margin-bottom: 12px;
                 box-shadow: 0px 4px 8px rgba(0,0,0,0.15);
-            ">🖨️ Imprimir Etiqueta Agora</button>
+            ">🖨️ Imprimir Página / Etiqueta</button>
         """
     st.markdown(btn_html_print, unsafe_allow_html=True)
 
     st.markdown(
         f"""
-            <a href="{url_qr}" target="_blank" style="
+            <a href="{url_qr}" target="_blank" download="etiqueta_{pallet_alvo}.png" style="
                 display: inline-block;
                 width: 100%;
                 background-color: #F1F5F9;
