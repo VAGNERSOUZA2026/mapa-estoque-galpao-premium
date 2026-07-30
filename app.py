@@ -1,10 +1,11 @@
-import base64
+Import base64
 import io
 import json
 import os
 import urllib.parse
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image
 
 # Importações seguras para processamento de imagem e decodificação de QR Code
@@ -103,11 +104,6 @@ st.markdown(
         font-size: 0.8rem;
         margin-left: 4px;
         display: inline-block;
-    }
-    @media print {
-        .sidebar, .stButton, header, footer, .stSelectbox {
-            display: none !important;
-        }
     }
     </style>
 """,
@@ -663,4 +659,7 @@ elif menu == "📥 Importar planilha (CSV/Excel)":
 
         for item in novos_itens:
           if "foto" not in item or pd.isna(item["foto"]):
-            item["foto
+            item["foto"] = None
+          for k, v in item.items():
+            if pd.isna(v):
+              i
