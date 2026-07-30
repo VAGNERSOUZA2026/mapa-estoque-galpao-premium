@@ -443,4 +443,3 @@ else:
   with col2:
     st.subheader("Garrafas por Safra")
     st.bar_chart(df_atual.groupby("Safra")["Total Garrafas"].sum())
-        
