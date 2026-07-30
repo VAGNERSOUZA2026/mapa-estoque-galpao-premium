@@ -5,6 +5,7 @@ import os
 import urllib.parse
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image
 
 # Importações seguras para processamento de imagem e decodificação de QR Code
@@ -103,16 +104,6 @@ st.markdown(
         font-size: 0.8rem;
         margin-left: 4px;
         display: inline-block;
-    }
-    @media print {
-        header, footer, .sidebar, .stButton, .stSelectbox, div[data-testid="stSidebar"], div[data-testid="stHeader"] {
-            display: none !important;
-        }
-        .printable-etiqueta {
-            display: block !important;
-            text-align: center;
-            padding: 20px;
-        }
     }
     </style>
 """,
@@ -743,12 +734,27 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
     )
 
   with col_acoes:
-    st.markdown("### 🖨️ Opções de Impressão")
+    st.markdown("### 🖨️ Opções da Etiqueta")
     st.write(f"**Posição:** {pallet_alvo}")
 
-    # Método compatível com Navegadores Desktop e Mobile
-    btn_html_print = f"""
-            <button onclick="window.print()" style="
+    # Abre em janela pop-up limpa e chama impressão sem ser bloqueado pelo iframe do Streamlit
+    js_imprimir = f"""
+            <script>
+            function abrirEImprimir() {{
+                var win = window.open('', '_blank');
+                win.document.write('<html><head><title>Etiqueta - {pallet_alvo}</title>');
+                win.document.write('<style>body {{ font-family: sans-serif; text-align: center; padding: 20px; }} img {{ width: 280px; height: 280px; margin: 15px 0; }} h2 {{ color: #581825; margin-bottom: 5px; }} h3 {{ color: #333; }}</style>');
+                win.document.write('</head><body>');
+                win.document.write('<h2>🍷 GALPÃO PREMIUM</h2>');
+                win.document.write('<h3>📍 {pallet_alvo}</h3>');
+                win.document.write('<img src="{url_qr}" /><br>');
+                win.document.write('<p>Escaneie para consultar os vinhos deste pallet</p>');
+                win.document.write('<script>window.onload = function() {{ window.print(); }};<\\/script>');
+                win.document.write('</body></html>');
+                win.document.close();
+            }}
+            </script>
+            <button onclick="abrirEImprimir()" style="
                 width: 100%;
                 background-color: #581825;
                 color: white;
@@ -761,9 +767,9 @@ elif menu == "🏷️ Gerar QR Code do Pallet":
                 cursor: pointer;
                 margin-bottom: 12px;
                 box-shadow: 0px 4px 8px rgba(0,0,0,0.15);
-            ">🖨️ Imprimir Página / Etiqueta</button>
+            ">🖨️ IMPRIMIR ETIQUETA AGORA</button>
         """
-    st.markdown(btn_html_print, unsafe_allow_html=True)
+    components.html(js_imprimir, height=65)
 
     st.markdown(
         f"""
