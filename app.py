@@ -23,12 +23,27 @@ try:
 except ImportError:
   PYZBAR_DISPONIVEL = False
 
+# URL da imagem no seu repositório GitHub
+URL_LOGO_GITHUB = "https://raw.githubusercontent.com/Vagner-Souza/mapa-estoque-galpao-premium/main/logo.png"
+
 # 1. Configuração da página Streamlit
 st.set_page_config(
     page_title="Mapa Estoque - Galpão Premium",
-    page_icon="https://raw.githubusercontent.com/SEU_USUARIO/mapa-estoque-galpao-premium/main/logo.png",
+    page_icon="logo.png",
     layout="wide",
     initial_sidebar_state="collapsed",
+)
+
+# Injeção de Meta Tags para Ícone da Tela Inicial no Celular e Navegadores
+st.markdown(
+    f"""
+    <head>
+        <link rel="apple-touch-icon" sizes="180x180" href="{URL_LOGO_GITHUB}">
+        <link rel="icon" type="image/png" sizes="32x32" href="{URL_LOGO_GITHUB}">
+        <link rel="shortcut icon" href="{URL_LOGO_GITHUB}">
+    </head>
+""",
+    unsafe_allow_html=True,
 )
 
 # 2. Estilização CSS Personalizada
@@ -291,21 +306,23 @@ if pallet_param:
         f"📦 Encontrado(s) {len(vinhos_no_pallet)} vinho(s) nesta posição:"
     )
     for v in vinhos_no_pallet:
-      c1, c2 = st.columns([3, 1])
-      with c1:
-        st.markdown(
-            f"""
-                <div class="wine-card">
-                    <div class="wine-title">🍷 {v.get('nome')} ({v.get('safra')})</div>
-                    <p><span class="badge-pallet">📍 {v.get('pallet')}</span> <span class="badge-info">Lado: {v.get('lado')}</span></p>
-                    <p style="margin-top:8px; font-size:0.9rem;"><b>Tipo:</b> {v.get('tipo')} | <b>Embalagem:</b> {v.get('caixa')}</p>
-                </div>
-                """,
-            unsafe_allow_html=True,
+      st.markdown(
+          f"""
+            <div class="wine-card">
+                <div class="wine-title">🍷 {v.get('nome')} ({v.get('safra')})</div>
+                <p><span class="badge-pallet">📍 {v.get('pallet')}</span> <span class="badge-info">Lado: {v.get('lado')}</span></p>
+                <p style="margin-top:8px; font-size:0.9rem;"><b>Tipo:</b> {v.get('tipo')} | <b>Embalagem:</b> {v.get('caixa')}</p>
+            </div>
+            """,
+          unsafe_allow_html=True,
+      )
+      if v.get("foto"):
+        st.image(
+            base64.b64decode(v.get("foto")),
+            caption="📸 Rótulo do Vinho (Toque para Zoom)",
+            use_container_width=True,
         )
-      with c2:
-        if v.get("foto"):
-          st.image(base64.b64decode(v.get("foto")), caption="Rótulo", width=90)
+        st.markdown("---")
   else:
     st.warning(f"⚠️ Nenhum vinho cadastrado no **{pallet_nome}** até o momento.")
 
@@ -413,23 +430,24 @@ if menu == "🔍 Buscar vinho":
         st.warning("⚠️ Nenhum vinho encontrado.")
       else:
         for v in resultados:
-          c1, c2 = st.columns([3, 1])
-          with c1:
-            st.markdown(
-                f"""
-                        <div class="wine-card">
-                            <div class="wine-title">🍷 {v.get('nome')} ({v.get('safra')})</div>
-                            <p><span class="badge-pallet">📍 {v.get('pallet')}</span> <span class="badge-info">Lado: {v.get('lado')}</span></p>
-                            <p style="margin-top:8px; font-size:0.9rem;"><b>Tipo:</b> {v.get('tipo')} | <b>Embalagem:</b> {v.get('caixa')}</p>
-                        </div>
-                        """,
-                unsafe_allow_html=True,
-            )
-          with c2:
-            if v.get("foto"):
+          st.markdown(
+              f"""
+                    <div class="wine-card">
+                        <div class="wine-title">🍷 {v.get('nome')} ({v.get('safra')})</div>
+                        <p><span class="badge-pallet">📍 {v.get('pallet')}</span> <span class="badge-info">Lado: {v.get('lado')}</span></p>
+                        <p style="margin-top:8px; font-size:0.9rem;"><b>Tipo:</b> {v.get('tipo')} | <b>Embalagem:</b> {v.get('caixa')}</p>
+                    </div>
+                    """,
+              unsafe_allow_html=True,
+          )
+          if v.get("foto"):
+            with st.expander("🔍 Ver / Aumentar Foto do Rótulo", expanded=True):
               st.image(
-                  base64.b64decode(v.get("foto")), caption="Rótulo", width=90
+                  base64.b64decode(v.get("foto")),
+                  caption="Toque na imagem para ver em Tela Cheia",
+                  use_container_width=True,
               )
+          st.markdown("---")
 
   with aba_foto:
     st.write("Tire uma foto ou envie a imagem do rótulo para pesquisar:")
@@ -440,7 +458,11 @@ if menu == "🔍 Buscar vinho":
     if foto_pesquisa is not None:
       try:
         img_pesquisa = Image.open(foto_pesquisa)
-        st.image(img_pesquisa, caption="Foto para Busca", width=150)
+        st.image(
+            img_pesquisa,
+            caption="Foto para Busca (Toque para Zoom)",
+            width=280,
+        )
 
         hash_pesquisa = calcular_hash_simples(img_pesquisa)
         encontrados = []
@@ -466,23 +488,24 @@ if menu == "🔍 Buscar vinho":
               f"🎯 Encontrado(s) {len(encontrados)} resultado(s) parecido(s):"
           )
           for diff, v in encontrados:
-            c1, c2 = st.columns([3, 1])
-            with c1:
-              st.markdown(
-                  f"""
-                            <div class="wine-card">
-                                <div class="wine-title">🍷 {v.get('nome')}</div>
-                                <p><span class="badge-pallet">📍 {v.get('pallet')}</span> <span class="badge-info">Lado: {v.get('lado')}</span></p>
-                                <p style="margin-top:8px; font-size:0.9rem;"><b>Safra:</b> {v.get('safra')} | <b>Caixa:</b> {v.get('caixa')}</p>
-                            </div>
-                            """,
-                  unsafe_allow_html=True,
-              )
-            with c2:
-              if v.get("foto"):
+            st.markdown(
+                f"""
+                        <div class="wine-card">
+                            <div class="wine-title">🍷 {v.get('nome')}</div>
+                            <p><span class="badge-pallet">📍 {v.get('pallet')}</span> <span class="badge-info">Lado: {v.get('lado')}</span></p>
+                            <p style="margin-top:8px; font-size:0.9rem;"><b>Safra:</b> {v.get('safra')} | <b>Caixa:</b> {v.get('caixa')}</p>
+                        </div>
+                        """,
+                unsafe_allow_html=True,
+            )
+            if v.get("foto"):
+              with st.expander("🔍 Ver / Aumentar Foto do Rótulo"):
                 st.image(
-                    base64.b64decode(v.get("foto")), caption="Banco", width=90
+                    base64.b64decode(v.get("foto")),
+                    caption="Rótulo Cadastrado",
+                    use_container_width=True,
                 )
+            st.markdown("---")
         else:
           st.warning(
               "⚠️ Nenhum vinho idêntico ou similar encontrado no cadastro."
