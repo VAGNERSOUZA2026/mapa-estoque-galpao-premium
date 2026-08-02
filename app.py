@@ -815,4 +815,4 @@ elif menu == "📷 Escanear QR Code":
           unsafe_allow_html=True,
       )
     else:
-      st.error("⚠️ Não foi possível decodificar o QR Code
+      st.error("⚠️ Não foi possível decodificar o QR Code da imagem.")
