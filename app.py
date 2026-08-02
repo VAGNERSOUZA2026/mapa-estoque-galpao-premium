@@ -35,55 +35,104 @@ if not os.path.exists(COMPROVANTES_DIR):
 # CONFIGURAÇÃO DA PÁGINA
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Peladinha FC | Gestão de Futebol Feminino",
+    page_title="Peladinha FC | Futebol Feminino",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # -----------------------------------------------------------------------------
-# ESTILIZAÇÃO CSS CUSTOMIZADA
+# ESTILIZAÇÃO CSS CUSTOMIZADA (DARK MODE + TOQUE FEMININO ELEGANTE)
 # -----------------------------------------------------------------------------
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+    
+    html, body, [class*="css"] { 
+        font-family: 'Poppins', sans-serif; 
+    }
 
+    /* Fundo geral escuro estilo aplicativo moderno */
+    .stApp {
+        background-color: #0b0f19;
+        color: #f8fafc;
+    }
+
+    /* Sidebar moderna */
+    [data-testid="stSidebar"] {
+        background-color: #0f172a;
+        border-right: 1px solid rgba(236, 72, 153, 0.2);
+    }
+
+    /* Estilização dos containers/cards para parecer com o app da foto */
+    div[data-testid="stVerticalBlock"] > div[style*="border"] {
+        background-color: #1e293b !important;
+        border: 1px solid rgba(236, 72, 153, 0.25) !important;
+        border-radius: 16px !important;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25) !important;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    
+    div[data-testid="stVerticalBlock"] > div[style*="border"]:hover {
+        border-color: #f43f5e !important;
+        transform: translateY(-2px);
+    }
+
+    /* Botões personalizados com toque feminino (rosa/magenta elegante) */
+    .stButton > button {
+        background: linear-gradient(135deg, #f43f5e 0%, #db2777 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-weight: 600;
+        padding: 0.5rem 1rem;
+        box-shadow: 0 4px 12px rgba(244, 63, 94, 0.3);
+        transition: all 0.3s ease;
+    }
+
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
+        box-shadow: 0 6px 16px rgba(244, 63, 94, 0.5);
+        color: white;
+    }
+
+    /* Hero Banner */
     .hero-banner {
-        background: linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.85)), 
-                    url('https://images.unsplash.com/photo-1518091043644-c1d4457512c6?q=80&w=1200&auto=format&fit=crop');
-        background-size: cover;
-        background-position: center;
-        border-radius: 16px;
-        padding: 25px 15px;
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border: 1px solid rgba(236, 72, 153, 0.3);
+        border-radius: 20px;
+        padding: 25px 20px;
         text-align: center;
         color: #FFFFFF;
-        box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.15);
-        margin-bottom: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        margin-bottom: 25px;
     }
-    .hero-title { font-size: 2.0rem; font-weight: 800; margin-bottom: 5px; color: #FFFFFF; }
-    .hero-subtitle { font-size: 0.9rem; font-weight: 300; color: #E2E8F0; }
+    .hero-title { font-size: 2.2rem; font-weight: 800; margin-bottom: 5px; color: #f43f5e; letter-spacing: -0.5px; }
+    .hero-subtitle { font-size: 0.95rem; font-weight: 400; color: #cbd5e1; }
 
+    /* Cartão de Aniversário */
     .card-bday {
-        background: linear-gradient(135deg, #FCE7F3 0%, #FBCFE8 100%);
-        border-left: 6px solid #EC4899;
+        background: linear-gradient(135deg, #500724 0%, #831843 100%);
+        border-left: 6px solid #f43f5e;
         padding: 18px;
-        border-radius: 12px;
+        border-radius: 14px;
         margin-bottom: 20px;
-        color: #831843;
+        color: #fce7f3;
         text-align: center;
         font-size: 1.1rem;
-        box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
+        box-shadow: 0px 6px 15px rgba(131, 24, 67, 0.4);
     }
 
+    /* Rodapé */
     .developer-footer {
-        background: #0F172A;
-        color: #94A3B8;
+        background: #0f172a;
+        color: #94a3b8;
         text-align: center;
-        padding: 12px;
-        border-radius: 10px;
-        margin-top: 30px;
+        padding: 15px;
+        border-radius: 12px;
+        margin-top: 35px;
         font-size: 0.85rem;
+        border: 1px solid rgba(236, 72, 153, 0.15);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -135,8 +184,6 @@ if "admin_nome" not in st.session_state:
     st.session_state.admin_nome = ""
 if "aba_ativa" not in st.session_state:
     st.session_state.aba_ativa = "Entrar"
-if "msg_cadastro_sucesso" not in st.session_state:
-    st.session_state.msg_cadastro_sucesso = False
 if "menu_escolhido" not in st.session_state:
     st.session_state.menu_escolhido = "🏠 Início / Dashboard"
 
