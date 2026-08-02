@@ -64,15 +64,6 @@ st.markdown("""
     .hero-title { font-size: 2.0rem; font-weight: 800; margin-bottom: 5px; color: #FFFFFF; }
     .hero-subtitle { font-size: 0.9rem; font-weight: 300; color: #E2E8F0; }
 
-    .card-notice {
-        background: #FEF3C7;
-        border-left: 6px solid #F59E0B;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 15px;
-        color: #78350F;
-    }
-
     .card-bday {
         background: linear-gradient(135deg, #FCE7F3 0%, #FBCFE8 100%);
         border-left: 6px solid #EC4899;
@@ -83,15 +74,6 @@ st.markdown("""
         text-align: center;
         font-size: 1.1rem;
         box-shadow: 0px 4px 12px rgba(0,0,0,0.05);
-    }
-
-    .card-team {
-        background-color: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-top: 5px solid #EC4899;
-        border-radius: 12px;
-        padding: 15px;
-        margin-bottom: 15px;
     }
 
     .developer-footer {
@@ -155,7 +137,8 @@ if "aba_ativa" not in st.session_state:
     st.session_state.aba_ativa = "Entrar"
 if "msg_cadastro_sucesso" not in st.session_state:
     st.session_state.msg_cadastro_sucesso = False
-
+if "menu_escolhido" not in st.session_state:
+    st.session_state.menu_escolhido = "🏠 Início / Dashboard"
 
 # -----------------------------------------------------------------------------
 # BANNER DA APLICAÇÃO
@@ -189,11 +172,9 @@ if aniversariantes_hoje_obj:
         if st.session_state.admin_logged:
             if tel_aniv:
                 st.markdown(f"<a href='{link_wapp}' target='_blank'><button style='background-color:#25D366; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:bold; margin-bottom:15px;'>📱 Enviar Mensagem de Aniversário via WhatsApp</button></a>", unsafe_allow_html=True)
-            else:
-                st.caption(f"⚠️ A jogadora {nome_aniv} não tem número de WhatsApp/contato cadastrado.")
 
 # -----------------------------------------------------------------------------
-# MENU LATERAL (SIDEBAR)
+# MENU LATERAL (SIDEBAR) COM SINCRONIZAÇÃO DE CARDS
 # -----------------------------------------------------------------------------
 st.sidebar.title("📌 Navegação")
 lista_menu = ["🏠 Início / Dashboard", "📌 Presença no Jogo", "🔀 Sorteio de Times", "💸 Pagamento & Pix", "📜 Regulamento", "📋 Elenco de Jogadoras"]
@@ -201,7 +182,11 @@ if st.session_state.admin_logged:
     lista_menu.insert(3, "📊 Fluxo de Caixa (Admin)")
 lista_menu.append("⚙️ Painel Admin")
 
-menu = st.sidebar.radio("Ir para:", lista_menu)
+if st.session_state.menu_escolhido not in lista_menu:
+    st.session_state.menu_escolhido = "🏠 Início / Dashboard"
+
+menu = st.sidebar.radio("Ir para:", lista_menu, index=lista_menu.index(st.session_state.menu_escolhido), key="radio_menu_principal")
+st.session_state.menu_escolhido = menu
 
 st.sidebar.markdown("---")
 st.sidebar.title("👤 Área da Jogadora")
