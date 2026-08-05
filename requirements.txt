@@ -3,4 +3,3 @@ pandas
 qrcode
 Pillow
 opencv-python-headless
-pyzbar
