@@ -33,7 +33,7 @@ st.markdown(
     .wine-title { color: #7A1C2E; font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
     .badge-pallet-grande { background-color: #7A1C2E; color: #FFFFFF; padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 1rem; display: inline-block; }
     .badge-caixa-grande { background-color: #343A40; color: #FFFFFF; padding: 6px 14px; border-radius: 8px; font-weight: 700; font-size: 1rem; display: inline-block; }
-    .stButton button { background-color: #7A1C2E !important; color: #FFFFFF !important; border-radius: 12px !important; font-weight: 600 !important; border: none !important; padding: 10px 16px !important; width: 100%; }
+    .stButton button { background-color: #7A1C2E !important; color: #FFFFFF !important; border-radius: 12px !important; font-weight: 600 !important; border: none !important; padding: 10px 16px !important; width: 100%; white-space: pre-wrap; }
     </style>
 """, unsafe_allow_html=True,
 )
@@ -257,7 +257,7 @@ elif st.session_state.menu_atual == "Filtros":
     if tp:
         res = [v for v in st.session_state.estoque if tp in v.get("nome", "").lower()]
         for v in res:
-            st.markdown(f"<div class='wine-card'><div class='wine-title'>🍷 {v.get('nome')} ({v.get('safra')})</div><p><span class='badge-pallet-grande'>📍 {v.get('localizacao')}</span></p></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='wine-card'><div class='wine-title'>🍷 {v.get('nome')} ({v.get('safra')})</div><p><span class='badge-pallet-grande'>📍 {v.get('localizacao')} - Lado: {v.get('lado', 'N/A')}</span></p></div>", unsafe_allow_html=True)
 
 elif st.session_state.menu_atual == "MapaSeparacao":
     st.subheader("🗺️ Mapa de Separação")
@@ -267,7 +267,7 @@ elif st.session_state.menu_atual == "MapaSeparacao":
         linhas = extrair_linhas_de_arquivo(arq) if arq else [l.strip() for l in txt_man.split("\n") if l.strip()]
         encontrados = [v for v in st.session_state.estoque if any(l.lower() in v.get("nome", "").lower() for l in linhas)]
         for v in encontrados:
-            st.markdown(f"<div class='wine-card'><div class='wine-title'>🍷 {v.get('nome')}</div><p><span class='badge-pallet-grande'>📍 {v.get('localizacao')}</span></p></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='wine-card'><div class='wine-title'>🍷 {v.get('nome')}</div><p><span class='badge-pallet-grande'>📍 {v.get('localizacao')} - Lado: {v.get('lado', 'N/A')}</span></p></div>", unsafe_allow_html=True)
 
 elif st.session_state.menu_atual == "Scanner":
     st.subheader("📷 Escanear QR Code do Local")
@@ -277,18 +277,30 @@ elif st.session_state.menu_atual == "Scanner":
         val, _, _ = cv2.QRCodeDetector().detectAndDecode(img)
         if val:
             termo_lido = val.strip().lower()
-            st.success(f"Localizado: {val}")
-            resultados = [v for v in st.session_state.estoque if termo_lido in str(v.get('localizacao', '')).lower()]
+            st.success(f"QR Code Lido: {val}")
+            
+            # Buscar qualquer vinho cuja localização + lado bata com o que está escrito no QR Code
+            resultados = []
+            for v in st.session_state.estoque:
+                loc_cadastrada = str(v.get('localizacao', '')).lower()
+                lado_cadastrado = str(v.get('lado', '')).lower()
+                
+                # Se o QR code contiver a localização exata, nós exibimos o resultado.
+                if loc_cadastrada in termo_lido:
+                    resultados.append(v)
+                    
             if resultados:
                 for v in resultados:
-                    st.markdown(f"<div class='wine-card'><div class='wine-title'>🍷 {v.get('nome')} ({v.get('safra', 'N/A')})</div><p>Local: <b>{v.get('localizacao', 'N/A')}</b></p></div>", unsafe_allow_html=True)
-            else: st.warning("Nenhum vinho neste local.")
-        else: st.error("QR Code não detectado.")
+                    st.markdown(f"<div class='wine-card'><div class='wine-title'>🍷 {v.get('nome')} ({v.get('safra', 'N/A')})</div><p>Local: <b>{v.get('localizacao', 'N/A')}</b> | Lado: <b>{v.get('lado', 'N/A')}</b></p></div>", unsafe_allow_html=True)
+            else: st.warning("Nenhum vinho encontrado com as especificações deste QR Code.")
+        else: st.error("QR Code não detectado. Tente aproximar mais a câmera.")
 
 elif st.session_state.menu_atual == "Estoque":
     st.subheader("🍷 Estoque Completo")
+    if not st.session_state.estoque:
+        st.info("O estoque está vazio.")
     for v in st.session_state.estoque:
-        st.markdown(f"<div class='wine-card'><div class='wine-title'>🍷 {v.get('nome')} ({v.get('safra')})</div><p><b>{v.get('localizacao')}</b></p></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='wine-card'><div class='wine-title'>🍷 {v.get('nome')} ({v.get('safra')})</div><p>📍 <b>{v.get('localizacao')}</b> - Lado: <b>{v.get('lado', 'N/A')}</b></p></div>", unsafe_allow_html=True)
 
 elif st.session_state.menu_atual == "Cadastrar":
     st.subheader("➕ Cadastrar Vinho")
@@ -312,15 +324,39 @@ elif st.session_state.menu_atual == "Cadastrar":
 
 elif st.session_state.menu_atual == "GerarQR":
     st.subheader("📱 Gerar QR Code")
-    locais = [f"{c} - {t} {n}" for c in LISTA_CORREDORES for t in LISTA_LOCAIS_TIPO for n in LISTA_NUMEROS_LOCAL]
-    l_sel = st.selectbox("Local", locais)
-    if l_sel:
-        _, cq, _ = st.columns([1, 2, 1])
-        with cq: st.image(gerar_qr_code_api(l_sel), width=240, caption=l_sel)
+    st.write("Selecione um vinho do estoque para gerar a etiqueta com sua localização exata:")
+    
+    if not st.session_state.estoque:
+        st.info("Cadastre pelo menos um vinho para gerar o QR Code da localização dele.")
+    else:
+        # Puxa APENAS as localizações reais dos vinhos cadastrados
+        opcoes_qr = []
+        for v in st.session_state.estoque:
+            texto_opcao = f"{v.get('nome')} | Local: {v.get('localizacao', '')} - Lado: {v.get('lado', '')}"
+            opcoes_qr.append(texto_opcao)
+            
+        selecao = st.selectbox("Vinho Cadastrado", opcoes_qr)
+        
+        # Pega a string que será transformada em QR Code
+        if selecao:
+            idx = opcoes_qr.index(selecao)
+            vinho_selecionado = st.session_state.estoque[idx]
+            
+            # O texto que vai ficar DENTRO do QR Code
+            texto_gerar = f"{vinho_selecionado.get('localizacao', '')} - Lado: {vinho_selecionado.get('lado', '')}"
+            
+            if st.button("Gerar Etiqueta"):
+                _, cq, _ = st.columns([1, 2, 1])
+                with cq: 
+                    st.image(gerar_qr_code_api(texto_gerar), width=240, caption=texto_gerar)
+                    st.success("QR Code gerado com sucesso!")
 
 elif st.session_state.menu_atual == "Historico":
     st.subheader("📋 Histórico")
-    for l in carregar_logs():
+    logs = carregar_logs()
+    if not logs:
+        st.info("Nenhum registro encontrado.")
+    for l in logs:
         st.markdown(f"- **{l['data_hora']}** | {l['usuario']} | {l['acao']}")
 
 elif st.session_state.menu_atual == "GerenciarUsuarios":
